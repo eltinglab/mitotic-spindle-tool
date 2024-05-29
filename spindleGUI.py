@@ -1,8 +1,8 @@
 import sys
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                              QSpinBox, QTableWidget, QTabWidget, QWidget, 
-                             QVBoxLayout, QHBoxLayout, QGridLayout)
-from PyQt6.QtGui import QPixmap
+                             QVBoxLayout, QHBoxLayout, QGridLayout, QFrame)
+from PySide6.QtGui import QPixmap
 
 # subclass QMainWindow to create a custom MainWindow
 class MainWindow(QMainWindow):
@@ -29,12 +29,18 @@ class MainWindow(QMainWindow):
 
         self.imageMap = QPixmap()
         imagePixLabel = QLabel()
+        imagePixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
+        imagePixLabel.setScaledContents(True)
         imagePixLabel.setPixmap(self.imageMap)
         self.threshMap = QPixmap()
         threshPixLabel = QLabel()
+        threshPixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
+        threshPixLabel.setScaledContents(True)
         threshPixLabel.setPixmap(self.threshMap)
         self.previewMap = QPixmap()
         previewPixLabel = QLabel()
+        previewPixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
+        previewPixLabel.setScaledContents(True)
         previewPixLabel.setPixmap(self.previewMap)
         self.dataTable = QTableWidget()
 
@@ -65,8 +71,8 @@ class MainWindow(QMainWindow):
         frameWidget.setLayout(tempHorizontal)
         tempVertical.addWidget(frameWidget)
         tempHorizontal = QHBoxLayout()
-        tempGrid.addWidget(self.previewButton, 0, 0)
-        tempGrid.addWidget(self.addButton, 0, 1)
+        tempGrid.addWidget(self.addButton, 0, 0)
+        tempGrid.addWidget(self.previewButton, 0, 1)
         tempGrid.addWidget(self.tossButton, 1, 0)
         tempGrid.addWidget(self.exportButton, 1, 1)
         bottomLeftWidget.setLayout(tempGrid)
@@ -77,6 +83,7 @@ class MainWindow(QMainWindow):
 
         tempVertical.addWidget(imagePixLabel)
         tempVertical.addWidget(threshPixLabel)
+        tempVertical.setContentsMargins(0,0,0,0)
         leftImagesWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
         tempHorizontal.addWidget(leftImagesWidget)
@@ -93,7 +100,7 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(centralWidget)
 
-# Create and display the application if this file is being run
+# create and display the application if this file is being run
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
