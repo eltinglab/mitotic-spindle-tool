@@ -1,7 +1,8 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                              QSpinBox, QTableWidget, QTabWidget, QWidget, 
-                             QVBoxLayout, QHBoxLayout, QGridLayout, QFrame)
+                             QVBoxLayout, QHBoxLayout, QGridLayout, QFrame,
+                             QSizePolicy)
 from PySide6.QtGui import QPixmap
 
 # subclass QMainWindow to create a custom MainWindow
@@ -27,21 +28,26 @@ class MainWindow(QMainWindow):
         self.tossButton = QPushButton("Toss Frame Data")
         self.exportButton = QPushButton("Export Data")
 
+        imageSizePolicy = QSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+
         self.imageMap = QPixmap()
         imagePixLabel = QLabel()
         imagePixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
-        imagePixLabel.setScaledContents(True)
+        imagePixLabel.setSizePolicy(imageSizePolicy)
         imagePixLabel.setPixmap(self.imageMap)
+
         self.threshMap = QPixmap()
         threshPixLabel = QLabel()
         threshPixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
-        threshPixLabel.setScaledContents(True)
+        threshPixLabel.setSizePolicy(imageSizePolicy)
         threshPixLabel.setPixmap(self.threshMap)
+
         self.previewMap = QPixmap()
         previewPixLabel = QLabel()
         previewPixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
-        previewPixLabel.setScaledContents(True)
+        previewPixLabel.setSizePolicy(imageSizePolicy)
         previewPixLabel.setPixmap(self.previewMap)
+
         self.dataTable = QTableWidget()
 
         # create container widgets and layouts
