@@ -4,6 +4,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                              QVBoxLayout, QHBoxLayout, QGridLayout, QFrame,
                              QSizePolicy)
 from PySide6.QtGui import QPixmap
+from PySide6.QtCore import Qt
+import tiffFunctions as tiffF
 
 # subclass QMainWindow to create a custom MainWindow
 class MainWindow(QMainWindow):
@@ -28,24 +30,18 @@ class MainWindow(QMainWindow):
         self.tossButton = QPushButton("Toss Frame Data")
         self.exportButton = QPushButton("Export Data")
 
-        imageSizePolicy = QSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        
 
-        self.imageMap = QPixmap()
-        imagePixLabel = QLabel()
-        imagePixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
-        imagePixLabel.setSizePolicy(imageSizePolicy)
+        self.imageMap = QPixmap(tiffF.defaultPix())
+        imagePixLabel = PixLabel()
         imagePixLabel.setPixmap(self.imageMap)
 
-        self.threshMap = QPixmap()
-        threshPixLabel = QLabel()
-        threshPixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
-        threshPixLabel.setSizePolicy(imageSizePolicy)
+        self.threshMap = QPixmap(tiffF.defaultPix())
+        threshPixLabel = PixLabel()
         threshPixLabel.setPixmap(self.threshMap)
 
-        self.previewMap = QPixmap()
-        previewPixLabel = QLabel()
-        previewPixLabel.setFrameStyle(QFrame.Panel | QFrame.Raised)
-        previewPixLabel.setSizePolicy(imageSizePolicy)
+        self.previewMap = QPixmap(tiffF.defaultPix())
+        previewPixLabel = PixLabel()
         previewPixLabel.setPixmap(self.previewMap)
 
         self.dataTable = QTableWidget()
@@ -58,7 +54,6 @@ class MainWindow(QMainWindow):
         threshWidget = QWidget()
         frameWidget = QWidget()
         bottomLeftWidget = QWidget()
-        leftImagesWidget = QWidget()
         imagesWidget = QWidget()
 
         tempHorizontal = QHBoxLayout()
@@ -87,12 +82,8 @@ class MainWindow(QMainWindow):
         leftWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
 
-        tempVertical.addWidget(imagePixLabel)
-        tempVertical.addWidget(threshPixLabel)
-        tempVertical.setContentsMargins(0,0,0,0)
-        leftImagesWidget.setLayout(tempVertical)
-        tempVertical = QVBoxLayout()
-        tempHorizontal.addWidget(leftImagesWidget)
+        tempHorizontal.addWidget(imagePixLabel)
+        tempHorizontal.addWidget(threshPixLabel)
         tempHorizontal.addWidget(previewPixLabel)
         imagesWidget.setLayout(tempHorizontal)
         tempHorizontal = QHBoxLayout()
@@ -105,6 +96,41 @@ class MainWindow(QMainWindow):
         tempHorizontal = QHBoxLayout()
 
         self.setCentralWidget(centralWidget)
+
+# QLabel for keeping the contained pixmap scaled correctly
+class PixLabel(QLabel):
+
+    # set up the PixLabel
+    def __init__(self):
+
+        # allow the QLabel to initialize itself
+        super().__init__()
+
+        # define a class pixmap variable
+        self.pix = None
+
+        # TODO find a way to keep the frame tight, not freeze max window
+        #self.setFrameStyle(QFrame.Panel | QFrame.Raised)
+        imgPolicy = QSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.setSizePolicy(imgPolicy)
+        self.setMinimumSize(100,100)
+
+    # scale pixmap to label w and h, keeping pixmap aspect ratio
+    def setPixmap(self, pix):
+        self.pix = pix
+        w = self.width()
+        h = self.height()
+        scaled = pix.scaled(w, 
+                            h, 
+                            Qt.KeepAspectRatio, 
+                            Qt.SmoothTransformation)
+        super().setPixmap(scaled)
+    
+    # rescale the pixmap when the label is resized
+    def resizeEvent(self, event):
+        self.setPixmap(self.pix)
+        self.setAlignment(Qt.AlignCenter)
+        super().resizeEvent(event)
 
 # create and display the application if this file is being run
 if __name__ == "__main__":

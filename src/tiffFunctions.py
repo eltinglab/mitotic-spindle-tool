@@ -15,7 +15,7 @@ def arrFromTiff(tiffFileName, frameNum):
     # create the array
     return np.array(im)
 
-# creates a normalized QPixmap from an array
+# creates a normalized QPixmap from a numpy array
 def pixFromArr(arr):
     # normalize the array
     temp = np.zeros(arr.shape, dtype = np.uint8)
@@ -40,3 +40,9 @@ def pixFromArr(arr):
 # turns a tiff file path directly into a QPixmap
 def pixFromTiff(fileName, frameNum):
     return pixFromArr(arrFromTiff(fileName, frameNum))
+
+# returns a grayscale pixmap
+def defaultPix():
+    array = np.arange(0, 100, 1, np.uint8)
+    array = np.reshape(array, (10, 10)) 
+    return pixFromArr(array)
