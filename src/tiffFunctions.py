@@ -2,6 +2,14 @@ from PIL import Image, ImageQt, ImageSequence
 from PySide6.QtGui import QPixmap
 import numpy as np
 
+# returns the number of frames in a tiff image
+def framesInTiff(tiffFileName):
+
+    # turn the file into a PIL Image
+    tiffImage = Image.open(tiffFileName)
+
+    return getattr(tiffImage, "n_frames", 1)
+
 # takes a .tiff file path and turns the image into an array
 def arrFromTiff(tiffFileName, frameNum):
 
@@ -34,6 +42,12 @@ def pixFromArr(arr):
                     ( (arr[i][j] - lowest) / (highest - lowest) ))
 
     im = Image.fromarray(temp)
+    im = ImageQt.ImageQt(im)
+    return QPixmap.fromImage(im)
+
+# same as pixFromArr, but no normalization
+def threshPixFromArr(arr):
+    im = Image.fromarray(arr)
     im = ImageQt.ImageQt(im)
     return QPixmap.fromImage(im)
 
