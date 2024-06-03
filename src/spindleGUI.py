@@ -165,12 +165,16 @@ class MainWindow(QMainWindow):
 
     # handle applying the threshold
     def applyThreshold(self):
-        arr = threshF.applyThreshToArr(self.imagePixLabel.imageArr,
-                                       self.threshValue.value(),
-                                       self.gOLIterationsValue.value(),
-                                       self.gOLFactorValue.value())
-        self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
-        self.threshPixLabel.setImageArr(arr)
+        if self.imagePixLabel.imageArr is not None:
+            arr = threshF.applyThreshToArr(self.imagePixLabel.imageArr,
+                                           self.threshValue.value(),
+                                           self.gOLIterationsValue.value(),
+                                           self.gOLFactorValue.value())
+            self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
+            self.threshPixLabel.setImageArr(arr)
+
+        # take focus away from the text fields
+        self.setFocus()
         
 # QLabel for keeping the contained pixmap scaled correctly
 class PixLabel(QLabel):
