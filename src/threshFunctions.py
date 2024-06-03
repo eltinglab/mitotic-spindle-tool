@@ -1,11 +1,11 @@
 import numpy as np
 
 # applys a threshold to an image array
-def applyThreshToArr(arr, thresh):
+def applyThreshToArr(arr, thresh, gOLF, gOLI):
 
-    # these may be turned into buttons later for function input
-    gOLFactor = 4
-    gOLIter = 1
+    # game of life factor and number of iterations
+    gOLFactor = gOLF
+    gOLIterations = gOLI
 
     # apply the initial threshold
     output = arr > thresh
@@ -17,7 +17,7 @@ def applyThreshToArr(arr, thresh):
     output[:, len(output[0]) - 1] = False
 
     # play game of life with the thresholded image
-    for i in range(0, gOLIter):
+    for i in range(0, gOLIterations):
         for r in range(1, len(output) - 1):
             for c in range(1, len(output[r]) - 1):
                 if np.sum(output[r-1:r+2, c-1:c+2]) < gOLFactor:

@@ -24,6 +24,12 @@ class MainWindow(QMainWindow):
 
         # create accessible widgets
         self.tiffButton = QPushButton("Import .tiff")
+        self.tiffButton.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
+
+        self.frameLabel = QLabel("Frame #")
+        self.frameValue = QSpinBox()
+        self.frameValue.setMinimum(1)
+        self.frameValue.setMaximum(1)
 
         self.threshLabel = QLabel("Threshold")
         self.threshValue = QSpinBox()
@@ -31,10 +37,20 @@ class MainWindow(QMainWindow):
         self.threshValue.setMinimum(0)
         self.threshValue.setMaximum(65535)
 
-        self.frameLabel = QLabel("Frame #")
-        self.frameValue = QSpinBox()
-        self.frameValue.setMinimum(1)
-        self.frameValue.setMaximum(1)
+        self.gOLIterationsLabel = QLabel("GOL Iterations")
+        self.gOLIterationsValue = QSpinBox()
+        self.gOLIterationsValue.setMinimum(1)
+        self.gOLIterationsValue.setMaximum(5)
+
+        self.gOLFactorLabel = QLabel("GOL Factor")
+        self.gOLFactorValue = QSpinBox()
+        self.gOLFactorValue.setMinimum(0)
+        self.gOLFactorValue.setMaximum(8)
+        self.gOLFactorValue.setValue(4)
+
+        self.thresholdButton = QPushButton("Apply Threshold")
+        self.thresholdButton.setSizePolicy(QSizePolicy.Maximum,
+                                           QSizePolicy.Maximum)
 
         self.previewButton = QPushButton("Preview")
         self.addButton = QPushButton("Add Frame Data")
@@ -60,8 +76,10 @@ class MainWindow(QMainWindow):
         leftWidget = QWidget()
         tabs = QTabWidget()
         tabs.setDocumentMode(True)
-        threshWidget = QWidget()
         frameWidget = QWidget()
+        threshWidget = QWidget()
+        gOLIterationsWidget = QWidget()
+        gOLFactorWidget = QWidget()
         bottomLeftWidget = QWidget()
         imagesWidget = QWidget()
 
@@ -70,17 +88,30 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         
         # place widgets in the app
-        tempVertical.addWidget(self.tiffButton)
-        tempHorizontal.addWidget(self.threshLabel)
-        tempHorizontal.addWidget(self.threshValue)
-        threshWidget.setLayout(tempHorizontal)
-        tempVertical.addWidget(threshWidget)
-        tempHorizontal = QHBoxLayout()
+        tempVertical.addWidget(self.tiffButton, alignment=Qt.AlignHCenter)
+        tempVertical.addStretch() # add stretch spacer
+        tempVertical.addWidget(self.thresholdButton, alignment=Qt.AlignHCenter)
         tempHorizontal.addWidget(self.frameLabel)
         tempHorizontal.addWidget(self.frameValue)
         frameWidget.setLayout(tempHorizontal)
         tempVertical.addWidget(frameWidget)
         tempHorizontal = QHBoxLayout()
+        tempHorizontal.addWidget(self.threshLabel)
+        tempHorizontal.addWidget(self.threshValue)
+        threshWidget.setLayout(tempHorizontal)
+        tempVertical.addWidget(threshWidget)
+        tempHorizontal = QHBoxLayout()
+        tempHorizontal.addWidget(self.gOLIterationsLabel)
+        tempHorizontal.addWidget(self.gOLIterationsValue)
+        gOLIterationsWidget.setLayout(tempHorizontal)
+        tempVertical.addWidget(gOLIterationsWidget)
+        tempHorizontal = QHBoxLayout()
+        tempHorizontal.addWidget(self.gOLFactorLabel)
+        tempHorizontal.addWidget(self.gOLFactorValue)
+        gOLFactorWidget.setLayout(tempHorizontal)
+        tempVertical.addWidget(gOLFactorWidget)
+        tempHorizontal = QHBoxLayout()
+        tempVertical.addStretch() # add stretch spacer
         tempGrid.addWidget(self.addButton, 0, 0)
         tempGrid.addWidget(self.previewButton, 0, 1)
         tempGrid.addWidget(self.tossButton, 1, 0)
@@ -108,7 +139,7 @@ class MainWindow(QMainWindow):
 
         # connect signals to slots
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
-        self.threshValue.textChanged.connect(self.onThreshUpdate)
+        self.thresholdButton.clicked.connect(self.applyThreshold)
         self.frameValue.textChanged.connect(self.onFrameUpdate)
     
     # handle import .tiff button push
@@ -121,7 +152,8 @@ class MainWindow(QMainWindow):
         # if the user selected a file successfully
         if self.fileName:
             self.onFrameUpdate()
-    
+            self.frameValue.setMaximum(tiffF.framesInTiff(self.fileName))
+
     # handle update of the frame number scroller
     def onFrameUpdate(self):
         self.imagePixLabel.setPixmap(
@@ -131,14 +163,12 @@ class MainWindow(QMainWindow):
                 tiffF.arrFromTiff(self.fileName,
                                     self.frameValue.value() - 1))
 
-        # update thresh image and the maximum allowed frame number
-        self.onThreshUpdate()
-        self.frameValue.setMaximum(tiffF.framesInTiff(self.fileName))
-    
-    # handle update of the threshold integer scroller
-    def onThreshUpdate(self):
+    # handle applying the threshold
+    def applyThreshold(self):
         arr = threshF.applyThreshToArr(self.imagePixLabel.imageArr,
-                self.threshValue.value())
+                                       self.threshValue.value(),
+                                       self.gOLIterationsValue.value(),
+                                       self.gOLFactorValue.value())
         self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
         self.threshPixLabel.setImageArr(arr)
         
