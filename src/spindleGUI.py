@@ -23,6 +23,7 @@ class MainWindow(QMainWindow):
         self.fileName = None
 
         # create accessible widgets
+        self.importLabel = QLabel("Import")
         self.tiffButton = QPushButton("Import .tiff")
         self.tiffButton.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
 
@@ -76,10 +77,8 @@ class MainWindow(QMainWindow):
         leftWidget = QWidget()
         tabs = QTabWidget()
         tabs.setDocumentMode(True)
-        frameWidget = QWidget()
-        threshWidget = QWidget()
-        gOLIterationsWidget = QWidget()
-        gOLFactorWidget = QWidget()
+        importWidget = QWidget()
+        thresholdWidget = QWidget()
         bottomLeftWidget = QWidget()
         imagesWidget = QWidget()
 
@@ -88,29 +87,24 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         
         # place widgets in the app
-        tempVertical.addWidget(self.tiffButton, alignment=Qt.AlignHCenter)
+        tempGrid.addWidget(self.importLabel, 0, 0)
+        tempGrid.addWidget(self.tiffButton, 0, 1)
+        importWidget.setLayout(tempGrid)
+        tempGrid = QGridLayout()
+        tempVertical.addWidget(importWidget)
         tempVertical.addStretch() # add stretch spacer
-        tempVertical.addWidget(self.thresholdButton, alignment=Qt.AlignHCenter)
-        tempHorizontal.addWidget(self.frameLabel)
-        tempHorizontal.addWidget(self.frameValue)
-        frameWidget.setLayout(tempHorizontal)
-        tempVertical.addWidget(frameWidget)
-        tempHorizontal = QHBoxLayout()
-        tempHorizontal.addWidget(self.threshLabel)
-        tempHorizontal.addWidget(self.threshValue)
-        threshWidget.setLayout(tempHorizontal)
-        tempVertical.addWidget(threshWidget)
-        tempHorizontal = QHBoxLayout()
-        tempHorizontal.addWidget(self.gOLIterationsLabel)
-        tempHorizontal.addWidget(self.gOLIterationsValue)
-        gOLIterationsWidget.setLayout(tempHorizontal)
-        tempVertical.addWidget(gOLIterationsWidget)
-        tempHorizontal = QHBoxLayout()
-        tempHorizontal.addWidget(self.gOLFactorLabel)
-        tempHorizontal.addWidget(self.gOLFactorValue)
-        gOLFactorWidget.setLayout(tempHorizontal)
-        tempVertical.addWidget(gOLFactorWidget)
-        tempHorizontal = QHBoxLayout()
+        tempGrid.addWidget(self.frameLabel, 0, 0)
+        tempGrid.addWidget(self.frameValue, 0, 1)
+        tempGrid.addWidget(self.threshLabel, 1, 0)
+        tempGrid.addWidget(self.threshValue, 1, 1)
+        tempGrid.addWidget(self.gOLIterationsLabel, 2, 0)
+        tempGrid.addWidget(self.gOLIterationsValue, 2, 1)
+        tempGrid.addWidget(self.gOLFactorLabel, 3, 0)
+        tempGrid.addWidget(self.gOLFactorValue, 3, 1)
+        tempGrid.addWidget(self.thresholdButton, 4, 1)
+        thresholdWidget.setLayout(tempGrid)
+        tempGrid = QGridLayout()
+        tempVertical.addWidget(thresholdWidget)
         tempVertical.addStretch() # add stretch spacer
         tempGrid.addWidget(self.addButton, 0, 0)
         tempGrid.addWidget(self.previewButton, 0, 1)
@@ -137,6 +131,13 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(centralWidget)
 
+        # set fixed button sizes
+        self.tiffButton.setFixedSize(self.thresholdButton.sizeHint())
+        self.previewButton.setFixedSize(self.thresholdButton.sizeHint())
+        self.addButton.setFixedSize(self.thresholdButton.sizeHint())
+        self.tossButton.setFixedSize(self.thresholdButton.sizeHint())
+        self.exportButton.setFixedSize(self.thresholdButton.sizeHint())
+        
         # connect signals to slots
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
         self.thresholdButton.clicked.connect(self.applyThreshold)
