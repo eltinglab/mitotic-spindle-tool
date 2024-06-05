@@ -22,6 +22,9 @@ class MainWindow(QMainWindow):
         # keep track of the open file name
         self.fileName = None
 
+        # keep track of whether the thresholded image has been cleared
+        self.threshCleared = True
+
         # create accessible widgets
         self.importLabel = QLabel("Import")
         self.tiffButton = QPushButton("Import .tiff")
@@ -142,6 +145,11 @@ class MainWindow(QMainWindow):
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
         self.thresholdButton.clicked.connect(self.applyThreshold)
         self.frameValue.textChanged.connect(self.onFrameUpdate)
+
+        self.frameValue.textChanged.connect(self.clearThreshImage)
+        self.threshValue.textChanged.connect(self.clearThreshImage)
+        self.gOLIterationsValue.textChanged.connect(self.clearThreshImage)
+        self.gOLFactorValue.textChanged.connect(self.clearThreshImage)
     
     # handle import .tiff button push
     def onInputTiffClicked(self):
@@ -157,6 +165,7 @@ class MainWindow(QMainWindow):
 
     # handle update of the frame number scroller
     def onFrameUpdate(self):
+
         self.imagePixLabel.setPixmap(
                 tiffF.pixFromTiff(self.fileName,
                                     self.frameValue.value() - 1))
@@ -167,6 +176,7 @@ class MainWindow(QMainWindow):
     # handle applying the threshold
     def applyThreshold(self):
         if self.imagePixLabel.imageArr is not None:
+
             arr = threshF.applyThreshToArr(self.imagePixLabel.imageArr,
                                            self.threshValue.value(),
                                            self.gOLIterationsValue.value(),
@@ -174,8 +184,16 @@ class MainWindow(QMainWindow):
             self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
             self.threshPixLabel.setImageArr(arr)
 
+            self.threshCleared = False
+
         # take focus away from the text fields
         self.setFocus()
+    
+    # slot called anytime the inputs are modified
+    def clearThreshImage(self):
+        if not self.threshCleared:
+            self.threshPixLabel.setPixmap(tiffF.defaultPix())
+            self.threshCleared = True
         
 # QLabel for keeping the contained pixmap scaled correctly
 class PixLabel(QLabel):
