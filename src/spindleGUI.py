@@ -61,14 +61,17 @@ class MainWindow(QMainWindow):
         self.tossButton = QPushButton("Toss Frame Data")
         self.exportButton = QPushButton("Export Data")
 
+        imageLabel = QLabel("Image")
         imageMap = QPixmap(tiffF.defaultPix())
         self.imagePixLabel = PixLabel()
         self.imagePixLabel.setPixmap(imageMap)
 
+        thresholdImageLabel = QLabel("Thresholded Image")
         threshMap = QPixmap(tiffF.defaultPix())
         self.threshPixLabel = PixLabel()
         self.threshPixLabel.setPixmap(threshMap)
 
+        previewImageLabel = QLabel("Preview")
         previewMap = QPixmap(tiffF.defaultPix())
         self.previewPixLabel = PixLabel()
         self.previewPixLabel.setPixmap(previewMap)
@@ -83,6 +86,9 @@ class MainWindow(QMainWindow):
         importWidget = QWidget()
         thresholdWidget = QWidget()
         bottomLeftWidget = QWidget()
+        imageWidget = QWidget()
+        thresholdImageWidget = QWidget()
+        previewImageWidget = QWidget()
         imagesWidget = QWidget()
 
         tempHorizontal = QHBoxLayout()
@@ -119,11 +125,24 @@ class MainWindow(QMainWindow):
         leftWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
 
-        tempHorizontal.addWidget(self.imagePixLabel)
-        tempHorizontal.addWidget(self.threshPixLabel)
-        tempHorizontal.addWidget(self.previewPixLabel)
+        tempVertical.addWidget(imageLabel, 10, Qt.AlignHCenter)
+        tempVertical.addWidget(self.imagePixLabel, 90)
+        imageWidget.setLayout(tempVertical)
+        tempVertical = QVBoxLayout()
+        tempVertical.addWidget(thresholdImageLabel, 10, Qt.AlignHCenter)
+        tempVertical.addWidget(self.threshPixLabel, 90)
+        thresholdImageWidget.setLayout(tempVertical)
+        tempVertical = QVBoxLayout()
+        tempVertical.addWidget(previewImageLabel, 10, Qt.AlignHCenter)
+        tempVertical.addWidget(self.previewPixLabel, 90)
+        previewImageWidget.setLayout(tempVertical)
+        tempVertical = QVBoxLayout()
+        tempHorizontal.addWidget(imageWidget)
+        tempHorizontal.addWidget(thresholdImageWidget)
+        tempHorizontal.addWidget(previewImageWidget)
         imagesWidget.setLayout(tempHorizontal)
         tempHorizontal = QHBoxLayout()
+        
         tabs.addTab(imagesWidget, "Images")
         tabs.addTab(self.dataTable, "Data")
 
@@ -212,7 +231,7 @@ class PixLabel(QLabel):
 
         imgPolicy = QSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.setSizePolicy(imgPolicy)
-        self.setMinimumSize(100,100)
+        self.setMinimumSize(150, 150)
     
     # setter method for arr
     def setImageArr(self, arr):
