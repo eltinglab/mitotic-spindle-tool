@@ -30,6 +30,8 @@ class MainWindow(QMainWindow):
         self.tiffButton = QPushButton("Import .tiff")
         self.tiffButton.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
 
+        self.totalFrameLabel = QLabel("# of Frames")
+        self.totalFrameValue = QLabel("0")
         self.frameLabel = QLabel("Frame #")
         self.frameValue = QSpinBox()
         self.frameValue.setMinimum(1)
@@ -102,15 +104,17 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         tempVertical.addWidget(importWidget)
         tempVertical.addStretch() # add stretch spacer
-        tempGrid.addWidget(self.frameLabel, 0, 0)
-        tempGrid.addWidget(self.frameValue, 0, 1)
-        tempGrid.addWidget(self.threshLabel, 1, 0)
-        tempGrid.addWidget(self.threshValue, 1, 1)
-        tempGrid.addWidget(self.gOLIterationsLabel, 2, 0)
-        tempGrid.addWidget(self.gOLIterationsValue, 2, 1)
-        tempGrid.addWidget(self.gOLFactorLabel, 3, 0)
-        tempGrid.addWidget(self.gOLFactorValue, 3, 1)
-        tempGrid.addWidget(self.thresholdButton, 4, 1)
+        tempGrid.addWidget(self.totalFrameLabel, 0, 0)
+        tempGrid.addWidget(self.totalFrameValue, 0, 1, Qt.AlignLeft)
+        tempGrid.addWidget(self.frameLabel, 1, 0)
+        tempGrid.addWidget(self.frameValue, 1, 1)
+        tempGrid.addWidget(self.threshLabel, 2, 0)
+        tempGrid.addWidget(self.threshValue, 2, 1)
+        tempGrid.addWidget(self.gOLIterationsLabel, 3, 0)
+        tempGrid.addWidget(self.gOLIterationsValue, 3, 1)
+        tempGrid.addWidget(self.gOLFactorLabel, 4, 0)
+        tempGrid.addWidget(self.gOLFactorValue, 4, 1)
+        tempGrid.addWidget(self.thresholdButton, 5, 1)
         thresholdWidget.setLayout(tempGrid)
         tempGrid = QGridLayout()
         tempVertical.addWidget(thresholdWidget)
@@ -180,7 +184,9 @@ class MainWindow(QMainWindow):
         # if the user selected a file successfully
         if self.fileName:
             self.onFrameUpdate()
-            self.frameValue.setMaximum(tiffF.framesInTiff(self.fileName))
+            numFrames = tiffF.framesInTiff(self.fileName)
+            self.frameValue.setMaximum(numFrames)
+            self.totalFrameValue.setText(str(numFrames))
 
             # reset input values and clear thresholded image
             self.frameValue.setValue(1)
