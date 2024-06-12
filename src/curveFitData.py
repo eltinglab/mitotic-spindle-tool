@@ -10,9 +10,11 @@ def curveFitData(imageArr, arr):
             threshArr[i,j] = arr[i,j]
     
     # count the number of points and preallocate vectors
-    numPoints = int(np.sum(threshArr))
-    c2 = np.zeros(numPoints)
-    r2 = np.zeros(numPoints)
+    totalPoints = int(np.sum(threshArr))
+
+    # make these int type to avoid default double assignment later
+    c2 = np.zeros(totalPoints, dtype=int)
+    r2 = np.zeros(totalPoints, dtype=int)
     count = 0
 
     # list of all x's and y's
@@ -38,8 +40,8 @@ def curveFitData(imageArr, arr):
 
             # check each point in the object until it finds a neighbor
             # or goes through all of them
-            j = len(tObjects[o].xCoords)
-            while noMatch and j > 0:
+            j = len(tObjects[o].xCoords) - 1
+            while noMatch and j >= 0:
 
                 # if it finds a neighbor, add it to the object
                 if (abs(tObjects[o].xCoords[j] - c2[i]) <= 2
@@ -63,7 +65,7 @@ def curveFitData(imageArr, arr):
     # point on other objects (not really EVERY point)
 
     # sort the objects array from most points to least
-    tObjects = np.sort(tObjects[:,:,-1])
+    tObjects.sort(reverse=True)
 
     # set startLength != len(tObjects) to enter the loop
     startLength = len(tObjects) + 1
@@ -78,11 +80,11 @@ def curveFitData(imageArr, arr):
             
             while o2 < len(tObjects): # comparing with other objects
                 noMatch = True
-                i = len(tObjects[o1].xCoords) # every point in o1
+                i = len(tObjects[o1].xCoords) - 1 # every point in o1
 
                 while noMatch and i >= 0:
-                    temp1 = tObjects[o2].xcoords
-                    temp2 = tObjects[o2].ycoords
+                    temp1 = tObjects[o2].xCoords
+                    temp2 = tObjects[o2].yCoords
                     coordTrunc = ((abs(temp1-tObjects[o1].xCoords[i]) < 10)
                                 * (abs(temp2-tObjects[o1].yCoords[i]) < 10))
 
@@ -94,9 +96,9 @@ def curveFitData(imageArr, arr):
                         tObjects[o1].addPoints(temp1, temp2)
                         tObjects.pop(o2)
                     
-                i -= 1
-            o2 += 1
-        o1 += 1
+                    i -= 1
+                o2 += 1
+            o1 += 1
     
     # CENTER OF MASS OF EACH OBJECT
     for o in range(0, len(tObjects)):
@@ -104,11 +106,11 @@ def curveFitData(imageArr, arr):
         xsum = 0
         ysum = 0
         for i in range(0, tObjects[o].numPoints):
-            mass += imageArr(tObjects[o].yCoords[i], tObjects[o].xCoords[i])
-            ysum += (imageArr(tObjects[o].yCoords[i], tObjects[o].xCoords[i])
-                    * tObjects[o].yCoords[i])
-            xsum += (imageArr(tObjects[o].yCoords[i], tObjects[o].xCoords[i])
-                    * tObjects[o].xCoords[i])
+            yC = tObjects[o].yCoords[i]
+            xC = tObjects[o].xCoords[i]
+            mass += imageArr[yC, xC]
+            ysum += imageArr[yC, xC] * tObjects[o].yCoords[i]
+            xsum += imageArr[yC, xC] * tObjects[o].xCoords[i]
         tObjects[o].com = [xsum/mass, ysum/mass]
     
     # FIND SPINDLE AUTOMATICALLY
@@ -116,7 +118,8 @@ def curveFitData(imageArr, arr):
     ycen = len(threshArr) / 2
 
     if len(tObjects) > 1:
-        avgObjectSize = np.mean([tObjects[:].numPoints])
+        numPointsArr = [getattr(o, "numPoints") for o in tObjects]
+        avgObjectSize = np.mean(numPointsArr)
 
         minDist = len(threshArr[0])
         for o in range(0, len(tObjects)):
@@ -147,6 +150,9 @@ class thresholdObject():
         self.yCoords = [y0]
         self.numPoints = 1
         self.com = []
+    
+    def __lt__(self, other):
+        return self.numPoints < other.numPoints
 
     def addPoint(self, xCoord, yCoord):
         self.xCoords.append(xCoord)
@@ -154,5 +160,5 @@ class thresholdObject():
         self.numPoints += 1
     
     def addPoints(self, x2s, y2s):
-        for x, y in x2s, y2s:
-            self.addPoint(x, y)
+        for i in range(0, len(x2s)):
+            self.addPoint(x2s[i], y2s[i])

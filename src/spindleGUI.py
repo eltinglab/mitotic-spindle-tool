@@ -228,7 +228,7 @@ class MainWindow(QMainWindow):
     # handle the preview button press
     def onPreviewClicked(self):
         if not self.threshCleared:
-            self.previewPixLabel.setPixmap(tiffF.threshPixFromArr(
+            self.previewPixLabel.setPixmap(tiffF.pixFromArr(
                     curveFitData(self.imagePixLabel.imageArr, 
                                  self.threshPixLabel.imageArr)))
     
