@@ -182,6 +182,15 @@ class MainWindow(QMainWindow):
             self.onFrameUpdate()
             self.frameValue.setMaximum(tiffF.framesInTiff(self.fileName))
 
+            # reset input values and clear thresholded image
+            self.frameValue.setValue(1)
+            self.threshValue.setValue(0)
+            self.gOLIterationsValue.setValue(1)
+            self.gOLFactorValue.setValue(4)
+            if not self.threshCleared:
+                self.threshPixLabel.setPixmap(tiffF.defaultPix())
+                self.threshCleared = True
+
     # handle update of the frame number scroller
     def onFrameUpdate(self):
 
@@ -242,7 +251,7 @@ class PixLabel(QLabel):
         self.pix = pix
         w = self.width()
         h = self.height()
-        scaled = pix.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        scaled = pix.scaled(w, h, Qt.KeepAspectRatio)
         super().setPixmap(scaled)
     
     # rescale the pixmap when the label is resized
