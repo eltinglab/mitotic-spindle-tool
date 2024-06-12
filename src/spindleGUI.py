@@ -7,6 +7,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QDir
 import tiffFunctions as tiffF
 import threshFunctions as threshF
+from curveFitData import curveFitData
 
 # subclass QMainWindow to create a custom MainWindow
 class MainWindow(QMainWindow):
@@ -168,6 +169,7 @@ class MainWindow(QMainWindow):
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
         self.thresholdButton.clicked.connect(self.applyThreshold)
         self.frameValue.textChanged.connect(self.onFrameUpdate)
+        self.previewButton.clicked.connect(self.onPreviewClicked)
 
         self.frameValue.textChanged.connect(self.clearThreshImage)
         self.threshValue.textChanged.connect(self.clearThreshImage)
@@ -222,6 +224,13 @@ class MainWindow(QMainWindow):
 
         # take focus away from the text fields
         self.setFocus()
+    
+    # handle the preview button press
+    def onPreviewClicked(self):
+        if not self.threshCleared:
+            self.previewPixLabel.setPixmap(tiffF.threshPixFromArr(
+                    curveFitData(self.imagePixLabel.imageArr, 
+                                 self.threshPixLabel.imageArr)))
     
     # slot called anytime the inputs are modified
     def clearThreshImage(self):

@@ -4,13 +4,13 @@ import numpy as np
 def curveFitData(imageArr, arr):
 
     # create identical array for manipulation
-    threshArr = np.array(shape=arr.shape)
+    threshArr = np.zeros(shape=arr.shape)
     for i in range(0, len(arr)):
         for j in range(0, len(arr[i])):
             threshArr[i,j] = arr[i,j]
     
     # count the number of points and preallocate vectors
-    numPoints = np.sum(threshArr)
+    numPoints = int(np.sum(threshArr))
     c2 = np.zeros(numPoints)
     r2 = np.zeros(numPoints)
     count = 0
@@ -18,7 +18,7 @@ def curveFitData(imageArr, arr):
     # list of all x's and y's
     for r in range(0, len(threshArr)):
         for c in range(0, len(threshArr[r])):
-            if threshArr(c,r) == 1:
+            if threshArr[r,c] == 1:
                 r2[count] = r
                 c2[count] = c
                 count += 1
@@ -29,12 +29,12 @@ def curveFitData(imageArr, arr):
     tObjects = [thresholdObject(c2[0], r2[0])]
 
     # go through each image point
-    for i in range(1, len(c2)):
+    for i in range(0, len(c2)):
         noMatch = True
 
         # go through each existing object
-        o = 1
-        while noMatch and o <= len(tObjects):
+        o = 0
+        while noMatch and o < len(tObjects):
 
             # check each point in the object until it finds a neighbor
             # or goes through all of them
