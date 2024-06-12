@@ -1,7 +1,7 @@
 import numpy as np
 
 # using thresholded image, return the desired parameters
-def curveFitData(arr):
+def curveFitData(imageArr, arr):
 
     # create identical array for manipulation
     threshArr = np.array(shape=arr.shape)
@@ -97,7 +97,46 @@ def curveFitData(arr):
                 i -= 1
             o2 += 1
         o1 += 1
+    
+    # CENTER OF MASS OF EACH OBJECT
+    for o in range(0, len(tObjects)):
+        mass = 0
+        xsum = 0
+        ysum = 0
+        for i in range(0, tObjects[o].numPoints):
+            mass += imageArr(tObjects[o].yCoords[i], tObjects[o].xCoords[i])
+            ysum += (imageArr(tObjects[o].yCoords[i], tObjects[o].xCoords[i])
+                    * tObjects[o].yCoords[i])
+            xsum += (imageArr(tObjects[o].yCoords[i], tObjects[o].xCoords[i])
+                    * tObjects[o].xCoords[i])
+        tObjects[o].com = [xsum/mass, ysum/mass]
+    
+    # FIND SPINDLE AUTOMATICALLY
+    xcen = len(threshArr[0]) / 2
+    ycen = len(threshArr) / 2
 
+    if len(tObjects) > 1:
+        avgObjectSize = np.mean([tObjects[:].numPoints])
+
+        minDist = len(threshArr[0])
+        for o in range(0, len(tObjects)):
+            if np.linalg.norm(np.array([xcen, ycen]) - np.array([tObjects[o].com])) < minDist and tObjects[o].numPoints > avgObjectSize:
+                minDist = np.linalg.norm(np.array([xcen, ycen]) - np.array([tObjects[o].com]))
+                centerObj = o
+        
+        spindle = tObjects[centerObj]
+    else:
+        spindle = tObjects[0]
+    
+    # create array with only the spindle object
+    spindleArr = np.zeros(threshArr.shape)
+    for i in range(0, spindle.numPoints):
+        spindleArr[spindle.yCoords[i], spindle.xCoords[i]] = 1
+    
+    # multiply original image by the one we just made
+    spindleImg = imageArr * spindleArr
+
+    return spindleImg
 
 # a class to represent threshold objects
 class thresholdObject():
@@ -107,6 +146,7 @@ class thresholdObject():
         self.xCoords = [x0]
         self.yCoords = [y0]
         self.numPoints = 1
+        self.com = []
 
     def addPoint(self, xCoord, yCoord):
         self.xCoords.append(xCoord)
