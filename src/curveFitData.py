@@ -42,7 +42,8 @@ def curveFitData(arr):
             while noMatch and j > 0:
 
                 # if it finds a neighbor, add it to the object
-                if abs(tObjects[o].xCoords[j] - c2[i]) <= 2 and abs(tObjects[o].yCoords[j] - r2[i]) <= 2:
+                if (abs(tObjects[o].xCoords[j] - c2[i]) <= 2
+                        and abs(tObjects[o].yCoords[j] - r2[i]) <= 2):
                     tObjects[o].addPoint(c2[i], r2[i])
                     noMatch = False
                 else:
@@ -62,7 +63,40 @@ def curveFitData(arr):
     # point on other objects (not really EVERY point)
 
     # sort the objects array from most points to least
-    # TODO: sort tObjects in reverse order of numPoints
+    tObjects = np.sort(tObjects[:,:,-1])
+
+    # set startLength != len(tObjects) to enter the loop
+    startLength = len(tObjects) + 1
+
+    while startLength != len(tObjects):
+
+        startLength = len(tObjects)
+
+        o1 = 0
+        while o1 < len(tObjects): # going through objects
+            o2 = o1 + 1
+            
+            while o2 < len(tObjects): # comparing with other objects
+                noMatch = True
+                i = len(tObjects[o1].xCoords) # every point in o1
+
+                while noMatch and i >= 0:
+                    temp1 = tObjects[o2].xcoords
+                    temp2 = tObjects[o2].ycoords
+                    coordTrunc = ((abs(temp1-tObjects[o1].xCoords[i]) < 10)
+                                * (abs(temp2-tObjects[o1].yCoords[i]) < 10))
+
+                    if sum(coordTrunc) > 0:
+                        # if any o1 points are within a radius of 10 of
+                        # any o2 points, consolidate objects
+                        # remove o2 from tObjects
+                        noMatch = False
+                        tObjects[o1].addPoints(temp1, temp2)
+                        tObjects.pop(o2)
+                    
+                i -= 1
+            o2 += 1
+        o1 += 1
 
 
 # a class to represent threshold objects
@@ -78,3 +112,7 @@ class thresholdObject():
         self.xCoords.append(xCoord)
         self.yCoords.append(yCoord)
         self.numPoints += 1
+    
+    def addPoints(self, x2s, y2s):
+        for x, y in x2s, y2s:
+            self.addPoint(x, y)
