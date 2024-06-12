@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.ndimage import rotate
 
 # using thresholded image, return the desired parameters
 def curveFitData(imageArr, arr):
@@ -139,7 +140,29 @@ def curveFitData(imageArr, arr):
     # multiply original image by the one we just made
     spindleImg = imageArr * spindleArr
 
-    return spindleImg
+    # FIND MOMENT OF INERTIA VECTORS
+    Ixx = 0
+    Iyy = 0
+    Ixy = 0
+
+    for y in range(0, len(spindleArr)):
+        for x in range(0, len(spindleArr[y])):
+            Ixx += spindleArr[y,x] * ((x - spindle.com[0]) ** 2)
+            Iyy += spindleArr[y,x] * ((y - spindle.com[1]) ** 2)
+            Ixy += spindleArr[y,x] * (x - spindle.com[0]) * (y - spindle.com[0])
+
+    tensorMat = np.array([[Ixx, Ixy],
+                          [Ixy, Iyy]])
+
+    # CALCULATE EIGENVECTORS AND ROTATE THE SPINDLE
+    eigenValues, eigenVectors = np.linalg.eig(tensorMat)
+    tempIndex = list(eigenValues).index(min(eigenValues))
+    mainvector = eigenVectors[:,tempIndex]
+
+    rotAngle = - np.arctan(mainvector[0]/mainvector[1]) * 180 / np.pi
+    rotImg = rotate(spindleImg, rotAngle)
+
+    return rotImg
 
 # a class to represent threshold objects
 class thresholdObject():
