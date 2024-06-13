@@ -179,12 +179,13 @@ class MainWindow(QMainWindow):
     # handle import .tiff button push
     def onInputTiffClicked(self):
 
-        self.fileName, filter = QFileDialog.getOpenFileName(
+        fileName, filter = QFileDialog.getOpenFileName(
                 parent=self, caption='Open .tiff',
                 dir=QDir.homePath(), filter='*.tiff;*.tif')
         
         # if the user selected a file successfully
-        if self.fileName:
+        if fileName:
+            self.fileName = fileName
             self.onFrameUpdate()
             numFrames = tiffF.framesInTiff(self.fileName)
             self.frameValue.setMaximum(numFrames)
