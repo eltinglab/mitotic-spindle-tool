@@ -23,8 +23,8 @@ class MainWindow(QMainWindow):
         # keep track of the open file name
         self.fileName = None
 
-        # keep track of whether the thresholded image has been cleared
-        self.threshCleared = True
+        # whether the threshold and preview images have been cleared
+        self.threshAndPreviewClear = True
 
         # create accessible widgets
         self.importLabel = QLabel("Import")
@@ -171,10 +171,10 @@ class MainWindow(QMainWindow):
         self.frameValue.textChanged.connect(self.onFrameUpdate)
         self.previewButton.clicked.connect(self.onPreviewClicked)
 
-        self.frameValue.textChanged.connect(self.clearThreshImage)
-        self.threshValue.textChanged.connect(self.clearThreshImage)
-        self.gOLIterationsValue.textChanged.connect(self.clearThreshImage)
-        self.gOLFactorValue.textChanged.connect(self.clearThreshImage)
+        self.frameValue.textChanged.connect(self.clearThreshAndPreview)
+        self.threshValue.textChanged.connect(self.clearThreshAndPreview)
+        self.gOLIterationsValue.textChanged.connect(self.clearThreshAndPreview)
+        self.gOLFactorValue.textChanged.connect(self.clearThreshAndPreview)
     
     # handle import .tiff button push
     def onInputTiffClicked(self):
@@ -196,9 +196,7 @@ class MainWindow(QMainWindow):
             self.threshValue.setValue(0)
             self.gOLIterationsValue.setValue(1)
             self.gOLFactorValue.setValue(4)
-            if not self.threshCleared:
-                self.threshPixLabel.setPixmap(tiffF.defaultPix())
-                self.threshCleared = True
+            self.clearThreshAndPreview()
 
     # handle update of the frame number scroller
     def onFrameUpdate(self):
@@ -221,23 +219,24 @@ class MainWindow(QMainWindow):
             self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
             self.threshPixLabel.setImageArr(arr)
 
-            self.threshCleared = False
+            self.threshAndPreviewClear = False
 
         # take focus away from the text fields
         self.setFocus()
     
     # handle the preview button press
     def onPreviewClicked(self):
-        if not self.threshCleared:
+        if not self.threshAndPreviewClear:
             self.previewPixLabel.setPixmap(tiffF.pixFromArr(
                     curveFitData(self.imagePixLabel.imageArr, 
                                  self.threshPixLabel.imageArr)))
     
     # slot called anytime the inputs are modified
-    def clearThreshImage(self):
-        if not self.threshCleared:
+    def clearThreshAndPreview(self):
+        if not self.threshAndPreviewClear:
             self.threshPixLabel.setPixmap(tiffF.defaultPix())
-            self.threshCleared = True
+            self.previewPixLabel.setPixmap(tiffF.defaultPix())
+            self.threshAndPreviewClear = True
         
 # QLabel for keeping the contained pixmap scaled correctly
 class PixLabel(QLabel):
