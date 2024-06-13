@@ -266,7 +266,7 @@ class PixLabel(QLabel):
         self.pix = pix
         w = self.width()
         h = self.height()
-        scaled = pix.scaled(w, h, Qt.KeepAspectRatio)
+        scaled = pix.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         super().setPixmap(scaled)
     
     # rescale the pixmap when the label is resized

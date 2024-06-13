@@ -162,7 +162,19 @@ def curveFitData(imageArr, arr):
     rotAngle = - np.arctan(mainvector[0]/mainvector[1]) * 180 / np.pi
     rotImg = rotate(spindleImg, rotAngle)
 
-    return rotImg
+    # SCIPY CORRECTION
+    # scipy.ndimage.rotate() has been observed in the debugger
+    # to set some values to negative numbers after rotation. When
+    # normalized for viewing, this causes the black pixels to be
+    # normalized to a gray. The following correction blacks out all
+    # negative values in rotImg
+    zeroRotImg = np.zeros(rotImg.shape)
+    for i in range(0, len(rotImg)):
+        for j in range(0, len(rotImg[i])):
+            if rotImg[i,j] > 0.0:
+                zeroRotImg[i,j] = rotImg[i,j]
+
+    return zeroRotImg
 
 # a class to represent threshold objects
 class thresholdObject():
