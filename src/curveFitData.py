@@ -26,6 +26,9 @@ def curveFitData(imageArr, arr):
                 c2[count] = c
                 count += 1
     
+    # FIXME - totalPoints is zero when image is completely dark
+    # which results in c2[0] being an invalid call
+    
     # CHECK EACH POINT AND SORT INTO OBJECTS
 
     # start object list with one object
@@ -149,7 +152,7 @@ def curveFitData(imageArr, arr):
         for x in range(0, len(spindleArr[y])):
             Ixx += spindleArr[y,x] * ((x - spindle.com[0]) ** 2)
             Iyy += spindleArr[y,x] * ((y - spindle.com[1]) ** 2)
-            Ixy += spindleArr[y,x] * (x - spindle.com[0]) * (y - spindle.com[0])
+            Ixy += spindleArr[y,x] * (x - spindle.com[0]) * (y - spindle.com[1])
 
     tensorMat = np.array([[Ixx, Ixy],
                           [Ixy, Iyy]])
