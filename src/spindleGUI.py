@@ -186,6 +186,7 @@ class MainWindow(QMainWindow):
         # if the user selected a file successfully
         if fileName:
             self.fileName = fileName
+            self.frameValue.setValue(1)
             self.onFrameUpdate()
             numFrames = tiffF.framesInTiff(self.fileName)
             self.frameValue.setMaximum(numFrames)
