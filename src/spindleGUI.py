@@ -1,6 +1,6 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
-                             QSpinBox, QTableWidget, QTabWidget, QWidget, 
+                             QSpinBox, QTableView, QTabWidget, QWidget, 
                              QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy,
                              QFileDialog)
 from PySide6.QtGui import QPixmap
@@ -79,7 +79,7 @@ class MainWindow(QMainWindow):
         self.previewPixLabel = PixLabel()
         self.previewPixLabel.setPixmap(previewMap)
 
-        self.dataTable = QTableWidget()
+        self.dataTable = QTableView()
 
         # create container widgets and layouts
         centralWidget = QWidget()
@@ -170,6 +170,7 @@ class MainWindow(QMainWindow):
         self.thresholdButton.clicked.connect(self.applyThreshold)
         self.frameValue.textChanged.connect(self.onFrameUpdate)
         self.previewButton.clicked.connect(self.onPreviewClicked)
+        self.addButton.clicked.connect(self.onAddDataClicked)
 
         self.frameValue.textChanged.connect(self.clearThreshAndPreview)
         self.threshValue.textChanged.connect(self.clearThreshAndPreview)
@@ -231,6 +232,17 @@ class MainWindow(QMainWindow):
             self.previewPixLabel.setPixmap(tiffF.pixFromArr(
                     curveFitData(self.imagePixLabel.imageArr, 
                                  self.threshPixLabel.imageArr)))
+    
+    # handle the add data button press
+    def onAddDataClicked(self):
+        if not self.threshAndPreviewClear:
+            dataNames, data = (
+                    curveFitData(self.imagePixLabel.imageArr,
+                                 self.threshPixLabel.imageArr,
+                                 False))
+        
+        # TODO - create a pandas dataframe to hold the data and display
+        # it in a QTableView
     
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):

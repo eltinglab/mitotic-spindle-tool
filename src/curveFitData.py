@@ -1,8 +1,10 @@
 import numpy as np
 from scipy.ndimage import rotate
+from scipy.integrate import quad
+from scipy.optimize import curve_fit
 
 # using thresholded image, return the desired parameters
-def curveFitData(imageArr, arr):
+def curveFitData(imageArr, arr, preview=True):
 
     # create identical array for manipulation
     threshArr = np.zeros(shape=arr.shape)
@@ -176,8 +178,87 @@ def curveFitData(imageArr, arr):
         for j in range(0, len(rotImg[i])):
             if rotImg[i,j] > 0.0:
                 zeroRotImg[i,j] = rotImg[i,j]
+    
+    if not preview:
+        dataNames, data = calculateMeasurements(zeroRotImg)
+        return dataNames, data
+    else:
+        return zeroRotImg
 
-    return zeroRotImg
+def calculateMeasurements(spindleArray):
+
+    # FIT CURVE AND FIND POLES
+    numPoints = np.sum(spindleArray > 0)
+
+    rotX = np.zeros(numPoints)
+    rotY = np.zeros(numPoints)
+
+    rotHeight, rotWidth = spindleArray.shape
+
+    count = 0
+    for r in range(0, rotHeight):
+        for c in range(0, rotWidth):
+            if spindleArray[r,c] > 0:
+                rotX[count] = c
+                rotY[count] = r
+                count += 1
+    
+    def quadFunc(x, a, b, c):
+        return a * (x ** 2) + b * x + c
+
+    params, covariances  = curve_fit(quadFunc, rotX, rotY)
+    a, b, c = params[0], params[1], params[2]
+
+    minX = min(rotX)
+    maxX = max(rotX)
+
+    leftPole = [minX, quadFunc(minX, a, b, c)]
+    rightPole = [maxX, quadFunc(maxX, a, b, c)]
+
+    # POLE SEPARATION
+    params, covariances = curve_fit(lambda x, a, b: a * x + b, rotX, rotY)
+    a = params[0]
+
+    poleSeparation = np.sqrt(a**2 + 1) * (maxX - minX)
+
+    # ARC LENGTH
+    def arcFunc(t):
+        return np.sqrt(4 * a**2 * t**2 + 4 * a * b * t + b**2 + 1)
+    arcLength = quad(arcFunc, minX, maxX)[0]
+    
+    # CURVATURE
+
+    # area metric
+    def spindleFunc(x):
+        return a * x**2 + b * x + c
+    
+    x1 = leftPole[0]
+    x2 = rightPole[0]
+    y1 = leftPole[1]
+    y2 = rightPole[1]
+    m1 = (y2 - y1) / (x2 - x1)
+    
+    def poleFunc(x):
+        return m1 * (x - x1) + y1
+    
+    areaCurve = abs(quad(poleFunc, x1, x2)[0] - quad(spindleFunc, x1, x2)[0])
+
+    # maximum and average curvature metrics
+    maxCurve = abs(2*a)
+    
+    def curvatureFunc(x):
+        return (2 * a) / ((4 * a**2 * x**2 + 4 * a * b * x + b**2 + 1)**(3/2))
+    
+    avgCurve = abs(quad(curvatureFunc, x1, x2)[0] / (x2 - x1))
+
+    # output dataNames and data
+    dataNames = ["Pole Separation (px)", "Arc Length (px)", 
+                 "Area Metric (px^2)", "Max Curvature (px^-1)", 
+                 "Avg Curvature (px^-1)"]
+    
+    data = [poleSeparation, arcLength, areaCurve, maxCurve, avgCurve]
+
+    return dataNames, data
 
 # a class to represent threshold objects
 class thresholdObject():
