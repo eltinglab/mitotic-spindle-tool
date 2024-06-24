@@ -2,7 +2,7 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                              QSpinBox, QTableView, QTabWidget, QWidget, 
                              QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy,
-                             QFileDialog)
+                             QFileDialog, QSplitter)
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
@@ -94,7 +94,7 @@ class MainWindow(QMainWindow):
         imageWidget = QWidget()
         thresholdImageWidget = QWidget()
         previewImageWidget = QWidget()
-        imagesWidget = QWidget()
+        imageSplitter = QSplitter()
 
         tempHorizontal = QHBoxLayout()
         tempVertical = QVBoxLayout()
@@ -144,13 +144,11 @@ class MainWindow(QMainWindow):
         tempVertical.addWidget(self.previewPixLabel, 90)
         previewImageWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
-        tempHorizontal.addWidget(imageWidget)
-        tempHorizontal.addWidget(thresholdImageWidget)
-        tempHorizontal.addWidget(previewImageWidget)
-        imagesWidget.setLayout(tempHorizontal)
-        tempHorizontal = QHBoxLayout()
+        imageSplitter.addWidget(imageWidget)
+        imageSplitter.addWidget(thresholdImageWidget)
+        imageSplitter.addWidget(previewImageWidget)
         
-        tabs.addTab(imagesWidget, "Images")
+        tabs.addTab(imageSplitter, "Images")
         tabs.addTab(self.dataTableView, "Data")
 
         tempHorizontal.addWidget(leftWidget)
@@ -279,9 +277,9 @@ class PixLabel(QLabel):
         # define a class pixArray variable
         self.imageArr = None
 
-        imgPolicy = QSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        imgPolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.setSizePolicy(imgPolicy)
-        self.setMinimumSize(150, 150)
+        self.setMinimumSize(75, 75)
     
     # setter method for arr
     def setImageArr(self, arr):
@@ -292,7 +290,7 @@ class PixLabel(QLabel):
         self.pix = pix
         w = self.width()
         h = self.height()
-        scaled = pix.scaled(w, h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        scaled = pix.scaled(w, h, Qt.KeepAspectRatio)
         super().setPixmap(scaled)
     
     # rescale the pixmap when the label is resized
