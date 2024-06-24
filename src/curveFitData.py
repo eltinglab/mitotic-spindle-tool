@@ -3,6 +3,10 @@ from scipy.ndimage import rotate
 from scipy.integrate import quad
 from scipy.optimize import curve_fit
 
+# define a constant
+DATA_NAMES = ("Pole Separation (px)", "Arc Length (px)", "Area Metric (px^2)",
+             "Max Curvature (px^-1)", "Avg Curvature (px^-1)")
+
 # using thresholded image, return the desired parameters
 def curveFitData(imageArr, arr, preview=True):
 
@@ -180,8 +184,7 @@ def curveFitData(imageArr, arr, preview=True):
                 zeroRotImg[i,j] = rotImg[i,j]
     
     if not preview:
-        dataNames, data = calculateMeasurements(zeroRotImg)
-        return dataNames, data
+        return calculateMeasurements(zeroRotImg)
     else:
         return zeroRotImg
 
@@ -251,14 +254,10 @@ def calculateMeasurements(spindleArray):
     
     avgCurve = abs(quad(curvatureFunc, x1, x2)[0] / (x2 - x1))
 
-    # output dataNames and data
-    dataNames = ["Pole Separation (px)", "Arc Length (px)", 
-                 "Area Metric (px^2)", "Max Curvature (px^-1)", 
-                 "Avg Curvature (px^-1)"]
-    
+    # output data
     data = [poleSeparation, arcLength, areaCurve, maxCurve, avgCurve]
 
-    return dataNames, data
+    return data
 
 # a class to represent threshold objects
 class thresholdObject():

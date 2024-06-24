@@ -4,10 +4,11 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                              QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy,
                              QFileDialog)
 from PySide6.QtGui import QPixmap
-from PySide6.QtCore import Qt, QDir
+from PySide6.QtCore import Qt, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
 import threshFunctions as threshF
-from curveFitData import curveFitData
+import curveFitData as cFD
+import numpy as np
 
 # subclass QMainWindow to create a custom MainWindow
 class MainWindow(QMainWindow):
@@ -79,7 +80,8 @@ class MainWindow(QMainWindow):
         self.previewPixLabel = PixLabel()
         self.previewPixLabel.setPixmap(previewMap)
 
-        self.dataTable = QTableView()
+        self.dataTableView = QTableView()
+        self.dataTableArray = None
 
         # create container widgets and layouts
         centralWidget = QWidget()
@@ -149,7 +151,7 @@ class MainWindow(QMainWindow):
         tempHorizontal = QHBoxLayout()
         
         tabs.addTab(imagesWidget, "Images")
-        tabs.addTab(self.dataTable, "Data")
+        tabs.addTab(self.dataTableView, "Data")
 
         tempHorizontal.addWidget(leftWidget)
         tempHorizontal.addWidget(tabs)
@@ -192,6 +194,13 @@ class MainWindow(QMainWindow):
             numFrames = tiffF.framesInTiff(self.fileName)
             self.frameValue.setMaximum(numFrames)
             self.totalFrameValue.setText(str(numFrames))
+            
+            # create the data array and place it in the QTableView
+            self.dataTableArray = np.zeros((numFrames, len(cFD.DATA_NAMES)))
+            self.dataTableModel = (
+                    imageTableModel(cFD.DATA_NAMES, self.dataTableArray))
+            self.dataTableView.setModel(self.dataTableModel)
+            self.dataTableView.resizeColumnsToContents()
 
             # reset input values and clear thresholded image
             self.frameValue.setValue(1)
@@ -230,19 +239,23 @@ class MainWindow(QMainWindow):
     def onPreviewClicked(self):
         if not self.threshAndPreviewClear:
             self.previewPixLabel.setPixmap(tiffF.pixFromArr(
-                    curveFitData(self.imagePixLabel.imageArr, 
+                    cFD.curveFitData(self.imagePixLabel.imageArr, 
                                  self.threshPixLabel.imageArr)))
     
     # handle the add data button press
     def onAddDataClicked(self):
         if not self.threshAndPreviewClear:
-            dataNames, data = (
-                    curveFitData(self.imagePixLabel.imageArr,
-                                 self.threshPixLabel.imageArr,
-                                 False))
+            data = (cFD.curveFitData(self.imagePixLabel.imageArr,
+                                     self.threshPixLabel.imageArr,
+                                     False))
         
-        # TODO - create a pandas dataframe to hold the data and display
-        # it in a QTableView
+            # add the row of data to the data table
+            self.dataTableModel.beginResetModel()
+            frameIndex = self.frameValue.value() - 1
+            for i in range(len(data)):
+                self.dataTableArray[frameIndex, i] = data[i]
+            # update the table view
+            self.dataTableModel.endResetModel()
     
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
@@ -287,6 +300,35 @@ class PixLabel(QLabel):
         self.setPixmap(self.pix)
         self.setAlignment(Qt.AlignCenter)
         super().resizeEvent(event)
+
+# BOILERPLATE TABLE MODEL
+class imageTableModel(QAbstractTableModel):
+    def __init__(self, dataNames, data):
+        super().__init__()
+
+        self._dataNames = dataNames
+        self._data = data
+
+    def data(self, index, role):
+        if role == Qt.DisplayRole:
+            return "%.2f" % self._data[index.row(), index.column()]
+        if role == Qt.TextAlignmentRole:
+            return Qt.AlignVCenter + Qt.AlignRight
+    
+    def rowCount(self, index):
+        return self._data.shape[0]
+    
+    def columnCount(self, index):
+        return self._data.shape[1]
+
+    def headerData(self, section, orientation, role):
+        # section is the index of the column/row.
+        if role == Qt.DisplayRole:
+            if orientation == Qt.Horizontal:
+                return str(self._dataNames[section])
+
+            if orientation == Qt.Vertical:
+                return str(section + 1)
 
 # create and display the application if this file is being run
 if __name__ == "__main__":
