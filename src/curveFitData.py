@@ -112,9 +112,9 @@ def curveFitData(imageArr, arr, preview=True):
     
     # CENTER OF MASS OF EACH OBJECT
     for o in range(0, len(tObjects)):
-        mass = 0
-        xsum = 0
-        ysum = 0
+        mass = np.uint64(0)
+        xsum = np.uint64(0)
+        ysum = np.uint64(0)
         for i in range(0, tObjects[o].numPoints):
             yC = tObjects[o].yCoords[i]
             xC = tObjects[o].xCoords[i]
