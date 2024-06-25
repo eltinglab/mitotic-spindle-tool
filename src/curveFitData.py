@@ -171,6 +171,10 @@ def curveFitData(imageArr, arr, preview=True):
     rotAngle = - np.arctan(mainvector[0]/mainvector[1]) * 180 / np.pi
     rotImg = rotate(spindleImg, rotAngle)
 
+    # FIXME - determine how to avoid many small floats that have to be
+    # cutoff after the rotation
+    tempCutoff = 27.0
+
     # SCIPY CORRECTION
     # scipy.ndimage.rotate() has been observed in the debugger
     # to set some values to negative numbers after rotation. When
@@ -180,7 +184,7 @@ def curveFitData(imageArr, arr, preview=True):
     zeroRotImg = np.zeros(rotImg.shape)
     for i in range(0, len(rotImg)):
         for j in range(0, len(rotImg[i])):
-            if rotImg[i,j] > 0.0:
+            if rotImg[i,j] >= tempCutoff:
                 zeroRotImg[i,j] = rotImg[i,j]
     
     if not preview:
@@ -191,7 +195,7 @@ def curveFitData(imageArr, arr, preview=True):
 def calculateMeasurements(spindleArray):
 
     # FIT CURVE AND FIND POLES
-    numPoints = np.sum(spindleArray > 0)
+    numPoints = int(np.sum(spindleArray > 0.0))
 
     rotX = np.zeros(numPoints)
     rotY = np.zeros(numPoints)
@@ -220,9 +224,8 @@ def calculateMeasurements(spindleArray):
 
     # POLE SEPARATION
     params, covariances = curve_fit(lambda x, a, b: a * x + b, rotX, rotY)
-    a = params[0]
-
-    poleSeparation = np.sqrt(a**2 + 1) * (maxX - minX)
+    a2 = params[0]
+    poleSeparation = np.sqrt(a2**2 + 1) * (maxX - minX)
 
     # ARC LENGTH
     def arcFunc(t):
