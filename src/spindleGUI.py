@@ -272,9 +272,11 @@ class MainWindow(QMainWindow):
     # handle the toss data button press
     def onTossDataClicked(self):
         tossedFrame = self.frameValue.value()
-        if tossedFrame not in self.tossedFrames:
+        if (tossedFrame not in self.tossedFrames 
+                and not self.threshAndPreviewClear):
             self.tossedFrames.append(tossedFrame)
             self.tossedFrames.sort()
+            self.onAddDataClicked() # this follows previous lab standard
 
         if self.fileName:
             self.frameValue.setValue(tossedFrame + 1)
