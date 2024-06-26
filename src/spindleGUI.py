@@ -174,6 +174,8 @@ class MainWindow(QMainWindow):
         self.frameValue.textChanged.connect(self.onFrameUpdate)
         self.previewButton.clicked.connect(self.onPreviewClicked)
         self.addButton.clicked.connect(self.onAddDataClicked)
+        self.tossButton.clicked.connect(self.onTossDataClicked)
+        self.exportButton.clicked.connect(self.onExportDataClicked)
 
         self.frameValue.textChanged.connect(self.clearThreshAndPreview)
         self.threshValue.textChanged.connect(self.clearThreshAndPreview)
@@ -260,10 +262,33 @@ class MainWindow(QMainWindow):
     
     # handle the toss data button press
     def onTossDataClicked(self):
-        if not self.threshAndPreviewClear:
-            tossedFrame = self.frameValue.value()
-            if tossedFrame not in self.tossedFrames():
-                self.tossedFrames.append(tossedFrame)
+        tossedFrame = self.frameValue.value()
+        if tossedFrame not in self.tossedFrames:
+            self.tossedFrames.append(tossedFrame)
+            self.tossedFrames.sort()
+    
+    # write the data to a textfile
+    def onExportDataClicked(self):
+        if self.fileName:
+
+            # prompt the user for the save location and file name
+            fileName, filter = QFileDialog.getSaveFileName(
+                    parent=self, caption='Export Image Data',
+                    dir=QDir.homePath(), filter="*.txt")
+            if not fileName:
+                return None # cancel the export
+            
+            with open(fileName, "w", encoding="utf-8") as f:
+
+                for column in range(self.dataTableArray.shape[1]):
+                    f.write(F"{cFD.DATA_NAMES[column]}\n")
+
+                    for row in range(self.dataTableArray.shape[0]):
+                        f.write(F"{self.dataTableArray[row, column]:.4f}\n")
+                
+                f.write("Bad Frames\n")
+                for frame in self.tossedFrames:
+                    f.write(F"{frame}\n")
     
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
