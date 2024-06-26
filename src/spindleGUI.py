@@ -309,7 +309,10 @@ class imageTableModel(QAbstractTableModel):
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
-            return "%.2f" % self._data[index.row(), index.column()]
+            if self._data[index.row(), index.column()] == 0.0:
+                return ""
+            else:
+                return "%.4f" % self._data[index.row(), index.column()]
         if role == Qt.TextAlignmentRole:
             return Qt.AlignVCenter + Qt.AlignRight
     

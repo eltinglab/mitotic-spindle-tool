@@ -169,28 +169,12 @@ def curveFitData(imageArr, arr, preview=True):
     mainvector = eigenVectors[:,tempIndex]
 
     rotAngle = - np.arctan(mainvector[0]/mainvector[1]) * 180 / np.pi
-    rotImg = rotate(spindleImg, rotAngle)
-
-    # FIXME - determine how to avoid many small floats that have to be
-    # cutoff after the rotation
-    tempCutoff = 27.0
-
-    # SCIPY CORRECTION
-    # scipy.ndimage.rotate() has been observed in the debugger
-    # to set some values to negative numbers after rotation. When
-    # normalized for viewing, this causes the black pixels to be
-    # normalized to a gray. The following correction blacks out all
-    # negative values in rotImg
-    zeroRotImg = np.zeros(rotImg.shape)
-    for i in range(0, len(rotImg)):
-        for j in range(0, len(rotImg[i])):
-            if rotImg[i,j] >= tempCutoff:
-                zeroRotImg[i,j] = rotImg[i,j]
+    rotImg = rotate(spindleImg, rotAngle, order=1)
     
     if not preview:
-        return calculateMeasurements(zeroRotImg)
+        return calculateMeasurements(rotImg)
     else:
-        return zeroRotImg
+        return rotImg
 
 def calculateMeasurements(spindleArray):
 
