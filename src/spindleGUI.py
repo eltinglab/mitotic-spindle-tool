@@ -27,6 +27,9 @@ class MainWindow(QMainWindow):
         # whether the threshold and preview images have been cleared
         self.threshAndPreviewClear = True
 
+        # bad frames reported by the user
+        self.tossedFrames = []
+
         # create accessible widgets
         self.importLabel = QLabel("Import")
         self.tiffButton = QPushButton("Import .tiff")
@@ -254,6 +257,13 @@ class MainWindow(QMainWindow):
                 self.dataTableArray[frameIndex, i] = data[i]
             # update the table view
             self.dataTableModel.endResetModel()
+    
+    # handle the toss data button press
+    def onTossDataClicked(self):
+        if not self.threshAndPreviewClear:
+            tossedFrame = self.frameValue.value()
+            if tossedFrame not in self.tossedFrames():
+                self.tossedFrames.append(tossedFrame)
     
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
