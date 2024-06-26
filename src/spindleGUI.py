@@ -2,7 +2,7 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                              QSpinBox, QTableView, QTabWidget, QWidget, 
                              QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy,
-                             QFileDialog, QSplitter)
+                             QFileDialog, QSplitter, QFrame)
 from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         self.imagePixLabel = PixLabel()
         self.imagePixLabel.setPixmap(imageMap)
 
-        thresholdImageLabel = QLabel("Thresholded Image")
+        thresholdImageLabel = QLabel("Threshold")
         threshMap = QPixmap(tiffF.defaultPix())
         self.threshPixLabel = PixLabel()
         self.threshPixLabel.setPixmap(threshMap)
@@ -86,19 +86,26 @@ class MainWindow(QMainWindow):
         self.dataTableView = QTableView()
         self.dataTableArray = None
 
+        imageLabels = (imageLabel, thresholdImageLabel, previewImageLabel)
+        imagePixLabels = (self.imagePixLabel, self.threshPixLabel, 
+                          self.previewPixLabel)
+        
+        imageSplitter = QSplitter()
+
         # create container widgets and layouts
         centralWidget = QWidget()
         leftWidget = QWidget()
         tabs = QTabWidget()
-        tabs.setDocumentMode(True)
         importWidget = QWidget()
         thresholdWidget = QWidget()
         bottomLeftWidget = QWidget()
         imageWidget = QWidget()
         thresholdImageWidget = QWidget()
         previewImageWidget = QWidget()
-        imageSplitter = QSplitter()
 
+        imageWidgets = (imageWidget, thresholdImageWidget, previewImageWidget)
+
+        tempImageWidget = QWidget()
         tempHorizontal = QHBoxLayout()
         tempVertical = QVBoxLayout()
         tempGrid = QGridLayout()
@@ -135,21 +142,21 @@ class MainWindow(QMainWindow):
         leftWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
 
-        tempVertical.addWidget(imageLabel, 10, Qt.AlignHCenter)
-        tempVertical.addWidget(self.imagePixLabel, 90)
-        imageWidget.setLayout(tempVertical)
-        tempVertical = QVBoxLayout()
-        tempVertical.addWidget(thresholdImageLabel, 10, Qt.AlignHCenter)
-        tempVertical.addWidget(self.threshPixLabel, 90)
-        thresholdImageWidget.setLayout(tempVertical)
-        tempVertical = QVBoxLayout()
-        tempVertical.addWidget(previewImageLabel, 10, Qt.AlignHCenter)
-        tempVertical.addWidget(self.previewPixLabel, 90)
-        previewImageWidget.setLayout(tempVertical)
-        tempVertical = QVBoxLayout()
-        imageSplitter.addWidget(imageWidget)
-        imageSplitter.addWidget(thresholdImageWidget)
-        imageSplitter.addWidget(previewImageWidget)
+        for i in range(len(imageLabels)):
+            tempVertical.addStretch()
+            tempVertical.addWidget(imageLabels[i],
+                               alignment=Qt.AlignLeft | Qt.AlignBottom)
+            tempHorizontal.setContentsMargins(0,0,0,0)
+            tempHorizontal.addWidget(imagePixLabels[i], alignment=Qt.AlignLeft)
+            tempHorizontal.addStretch()
+            tempImageWidget.setLayout(tempHorizontal)
+            tempHorizontal = QHBoxLayout()
+            tempVertical.addWidget(tempImageWidget)
+            tempImageWidget = QWidget()
+            tempVertical.addStretch()
+            imageWidgets[i].setLayout(tempVertical)
+            tempVertical = QVBoxLayout()
+            imageSplitter.addWidget(imageWidgets[i])
         
         tabs.addTab(imageSplitter, "Images")
         tabs.addTab(self.dataTableView, "Data")
@@ -314,7 +321,9 @@ class PixLabel(QLabel):
 
         imgPolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.setSizePolicy(imgPolicy)
-        self.setMinimumSize(75, 75)
+        self.setMinimumSize(75, 25)
+        self.setFrameStyle(QFrame.Panel | QFrame.Raised)
+        self.setLineWidth(3)
     
     # setter method for arr
     def setImageArr(self, arr):
@@ -323,9 +332,7 @@ class PixLabel(QLabel):
     # scale pixmap to label w and h, keeping pixmap aspect ratio
     def setPixmap(self, pix):
         self.pix = pix
-        w = self.width()
-        h = self.height()
-        scaled = pix.scaled(w, h, Qt.KeepAspectRatio)
+        scaled = pix.scaled(self.size(), Qt.KeepAspectRatio)
         super().setPixmap(scaled)
     
     # rescale the pixmap when the label is resized
