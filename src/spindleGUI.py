@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                              QSpinBox, QTableView, QTabWidget, QWidget, 
                              QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy,
                              QFileDialog, QSplitter, QFrame)
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QColor
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
 import threshFunctions as threshF
@@ -276,9 +276,10 @@ class MainWindow(QMainWindow):
                 and not self.threshAndPreviewClear):
             self.tossedFrames.append(tossedFrame)
             self.tossedFrames.sort()
+            self.dataTableModel.addTossedRow(tossedFrame)
             self.onAddDataClicked() # this follows previous lab standard
 
-        if self.fileName:
+        if self.fileName and not self.threshAndPreviewClear:
             self.frameValue.setValue(tossedFrame + 1)
     
     # write the data to a textfile
@@ -355,6 +356,10 @@ class imageTableModel(QAbstractTableModel):
 
         self._dataNames = dataNames
         self._data = data
+        self._tossedRows = []
+
+    def addTossedRow(self, row):
+        self._tossedRows.append(row)
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
@@ -364,6 +369,9 @@ class imageTableModel(QAbstractTableModel):
                 return "%.4f" % self._data[index.row(), index.column()]
         if role == Qt.TextAlignmentRole:
             return Qt.AlignVCenter + Qt.AlignRight
+        if role == Qt.ForegroundRole:
+            if (index.row() + 1) in self._tossedRows:
+                return QColor("red")
     
     def rowCount(self, index):
         return self._data.shape[0]
