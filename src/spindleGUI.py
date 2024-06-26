@@ -266,6 +266,8 @@ class MainWindow(QMainWindow):
                 self.dataTableArray[frameIndex, i] = data[i]
             # update the table view
             self.dataTableModel.endResetModel()
+            
+            self.frameValue.setValue(frameIndex + 2)
     
     # handle the toss data button press
     def onTossDataClicked(self):
@@ -273,6 +275,9 @@ class MainWindow(QMainWindow):
         if tossedFrame not in self.tossedFrames:
             self.tossedFrames.append(tossedFrame)
             self.tossedFrames.sort()
+
+        if self.fileName:
+            self.frameValue.setValue(tossedFrame + 1)
     
     # write the data to a textfile
     def onExportDataClicked(self):
