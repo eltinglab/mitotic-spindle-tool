@@ -1,7 +1,7 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
-                             QSpinBox, QTableView, QTabWidget, QWidget, 
-                             QVBoxLayout, QHBoxLayout, QGridLayout, QSizePolicy,
+                             QSpinBox, QTableView, QWidget, QVBoxLayout,
+                             QHBoxLayout, QGridLayout, QSizePolicy,
                              QFileDialog, QSplitter, QFrame)
 from PySide6.QtGui import QPixmap, QColor
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel
@@ -34,13 +34,16 @@ class MainWindow(QMainWindow):
 
         self.totalFrameLabel = QLabel("# of Frames")
         self.totalFrameValue = QLabel("0")
+        self.totalFrameValue.setAlignment(Qt.AlignRight)
         self.frameLabel = QLabel("Frame #")
         self.frameValue = QSpinBox()
+        self.frameValue.setAlignment(Qt.AlignRight)
         self.frameValue.setMinimum(1)
         self.frameValue.setMaximum(1)
 
         self.threshLabel = QLabel("Threshold")
         self.threshValue = QSpinBox()
+        self.threshValue.setAlignment(Qt.AlignRight)
         self.threshValue.setSingleStep(100)
         self.threshValue.setMinimum(0)
         self.threshValue.setMaximum(65535)
@@ -48,11 +51,13 @@ class MainWindow(QMainWindow):
 
         self.gOLIterationsLabel = QLabel("GOL Iterations")
         self.gOLIterationsValue = QSpinBox()
+        self.gOLIterationsValue.setAlignment(Qt.AlignRight)
         self.gOLIterationsValue.setMinimum(1)
         self.gOLIterationsValue.setMaximum(5)
 
         self.gOLFactorLabel = QLabel("GOL Factor")
         self.gOLFactorValue = QSpinBox()
+        self.gOLFactorValue.setAlignment(Qt.AlignRight)
         self.gOLFactorValue.setMinimum(0)
         self.gOLFactorValue.setMaximum(8)
         self.gOLFactorValue.setValue(4)
@@ -91,7 +96,7 @@ class MainWindow(QMainWindow):
         # create container widgets and layouts
         centralWidget = QWidget()
         leftWidget = QWidget()
-        tabs = QTabWidget()
+        rightWidget = QWidget()
         importWidget = QWidget()
         thresholdWidget = QWidget()
         bottomLeftWidget = QWidget()
@@ -114,7 +119,7 @@ class MainWindow(QMainWindow):
         tempVertical.addWidget(importWidget)
         tempVertical.addStretch() # add stretch spacer
         tempGrid.addWidget(self.totalFrameLabel, 0, 0)
-        tempGrid.addWidget(self.totalFrameValue, 0, 1, Qt.AlignLeft)
+        tempGrid.addWidget(self.totalFrameValue, 0, 1, Qt.AlignRight)
         tempGrid.addWidget(self.frameLabel, 1, 0)
         tempGrid.addWidget(self.frameValue, 1, 1)
         tempGrid.addWidget(self.threshLabel, 2, 0)
@@ -138,7 +143,6 @@ class MainWindow(QMainWindow):
         tempVertical = QVBoxLayout()
 
         for i in range(len(imageLabels)):
-            tempVertical.addStretch()
             tempVertical.addWidget(imageLabels[i],
                                alignment=Qt.AlignLeft | Qt.AlignBottom)
             tempHorizontal.setContentsMargins(0,0,0,0)
@@ -153,11 +157,13 @@ class MainWindow(QMainWindow):
             tempVertical = QVBoxLayout()
             imageSplitter.addWidget(imageWidgets[i])
         
-        tabs.addTab(imageSplitter, "Images")
-        tabs.addTab(self.dataTableView, "Data")
+        tempVertical.addWidget(imageSplitter, stretch=70)
+        tempVertical.addWidget(self.dataTableView, stretch=30)
+        rightWidget.setLayout(tempVertical)
+        tempVertical = QVBoxLayout()
 
         tempHorizontal.addWidget(leftWidget)
-        tempHorizontal.addWidget(tabs)
+        tempHorizontal.addWidget(rightWidget)
         centralWidget.setLayout(tempHorizontal)
         tempHorizontal = QHBoxLayout()
 
@@ -182,6 +188,17 @@ class MainWindow(QMainWindow):
         self.addButton.clicked.connect(self.onAddDataClicked)
         self.tossButton.clicked.connect(self.onTossDataClicked)
         self.exportButton.clicked.connect(self.onExportDataClicked)
+
+        # center window on the desktop
+        def centerApplication(xSize, ySize):
+            self.setGeometry(100, 100, xSize, ySize)
+            qFrameRect = self.frameGeometry()
+            center_point = QApplication.primaryScreen().geometry().center()
+            qFrameRect.moveCenter(center_point)
+            self.setGeometry(qFrameRect.topLeft().x(),
+                             qFrameRect.topLeft().y(),
+                             xSize, ySize)
+        centerApplication(850, 400)
     
     # handle import .tiff button push
     def onInputTiffClicked(self):
@@ -259,7 +276,10 @@ class MainWindow(QMainWindow):
                 self.dataTableArray[frameIndex, i] = data[i]
             # update the table view
             self.dataTableModel.endResetModel()
-            
+
+            indexOfData = self.dataTableModel.createIndex(frameIndex, 0)
+            self.dataTableView.scrollTo(indexOfData)
+
             self.frameValue.setValue(frameIndex + 2)
     
     # handle the toss data button press
@@ -273,6 +293,9 @@ class MainWindow(QMainWindow):
 
         if self.fileName:
             self.frameValue.setValue(tossedFrame + 1)
+
+            indexOfData = self.dataTableModel.createIndex(tossedFrame - 1, 0)
+            self.dataTableView.scrollTo(indexOfData)
     
     # write the data to a textfile
     def onExportDataClicked(self):
@@ -322,7 +345,7 @@ class PixLabel(QLabel):
         self.setSizePolicy(imgPolicy)
         self.setMinimumSize(75, 25)
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
-        self.setLineWidth(3)
+        self.setLineWidth(2)
     
     # setter method for arr
     def setImageArr(self, arr):
