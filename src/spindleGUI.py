@@ -24,9 +24,6 @@ class MainWindow(QMainWindow):
         # keep track of the open file name
         self.fileName = None
 
-        # whether the threshold and preview images have been cleared
-        self.threshAndPreviewClear = True
-
         # bad frames reported by the user
         self.tossedFrames = []
 
@@ -59,13 +56,11 @@ class MainWindow(QMainWindow):
         self.gOLFactorValue.setMaximum(8)
         self.gOLFactorValue.setValue(4)
 
-        self.thresholdButton = QPushButton("Apply Threshold")
-        self.thresholdButton.setSizePolicy(QSizePolicy.Maximum,
-                                           QSizePolicy.Maximum)
-
         self.previewButton = QPushButton("Preview")
         self.addButton = QPushButton("Add Frame Data")
         self.tossButton = QPushButton("Toss Frame Data")
+        self.tossButton.setSizePolicy(QSizePolicy.Maximum,
+                                           QSizePolicy.Maximum)
         self.exportButton = QPushButton("Export Data")
 
         imageLabel = QLabel("Image")
@@ -127,7 +122,6 @@ class MainWindow(QMainWindow):
         tempGrid.addWidget(self.gOLIterationsValue, 3, 1)
         tempGrid.addWidget(self.gOLFactorLabel, 4, 0)
         tempGrid.addWidget(self.gOLFactorValue, 4, 1)
-        tempGrid.addWidget(self.thresholdButton, 5, 1)
         thresholdWidget.setLayout(tempGrid)
         tempGrid = QGridLayout()
         tempVertical.addWidget(thresholdWidget)
@@ -169,25 +163,24 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(centralWidget)
 
         # set fixed button sizes
-        self.tiffButton.setFixedSize(self.thresholdButton.sizeHint())
-        self.previewButton.setFixedSize(self.thresholdButton.sizeHint())
-        self.addButton.setFixedSize(self.thresholdButton.sizeHint())
-        self.tossButton.setFixedSize(self.thresholdButton.sizeHint())
-        self.exportButton.setFixedSize(self.thresholdButton.sizeHint())
+        self.tiffButton.setFixedSize(self.tossButton.sizeHint())
+        self.previewButton.setFixedSize(self.tossButton.sizeHint())
+        self.addButton.setFixedSize(self.tossButton.sizeHint())
+        self.tossButton.setFixedSize(self.tossButton.sizeHint())
+        self.exportButton.setFixedSize(self.tossButton.sizeHint())
         
         # connect signals to slots
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
-        self.thresholdButton.clicked.connect(self.applyThreshold)
+
         self.frameValue.textChanged.connect(self.onFrameUpdate)
+        self.threshValue.textChanged.connect(self.applyThreshold)
+        self.gOLIterationsValue.textChanged.connect(self.applyThreshold)
+        self.gOLFactorValue.textChanged.connect(self.applyThreshold)
+
         self.previewButton.clicked.connect(self.onPreviewClicked)
         self.addButton.clicked.connect(self.onAddDataClicked)
         self.tossButton.clicked.connect(self.onTossDataClicked)
         self.exportButton.clicked.connect(self.onExportDataClicked)
-
-        self.frameValue.textChanged.connect(self.clearThreshAndPreview)
-        self.threshValue.textChanged.connect(self.clearThreshAndPreview)
-        self.gOLIterationsValue.textChanged.connect(self.clearThreshAndPreview)
-        self.gOLFactorValue.textChanged.connect(self.clearThreshAndPreview)
     
     # handle import .tiff button push
     def onInputTiffClicked(self):
@@ -199,6 +192,7 @@ class MainWindow(QMainWindow):
         # if the user selected a file successfully
         if fileName:
             self.fileName = fileName
+            self.clearThreshAndPreview()
             self.frameValue.setValue(1)
             self.onFrameUpdate()
             numFrames = tiffF.framesInTiff(self.fileName)
@@ -212,15 +206,15 @@ class MainWindow(QMainWindow):
             self.dataTableView.setModel(self.dataTableModel)
             self.dataTableView.resizeColumnsToContents()
 
-            # reset input values and clear thresholded image
+            # reset input values
             self.frameValue.setValue(1)
             self.threshValue.setValue(0)
             self.gOLIterationsValue.setValue(1)
             self.gOLFactorValue.setValue(4)
-            self.clearThreshAndPreview()
 
     # handle update of the frame number scroller
     def onFrameUpdate(self):
+        self.clearThreshAndPreview()
 
         self.imagePixLabel.setPixmap(
                 tiffF.pixFromTiff(self.fileName,
@@ -228,33 +222,30 @@ class MainWindow(QMainWindow):
         self.imagePixLabel.setImageArr(
                 tiffF.arrFromTiff(self.fileName,
                                     self.frameValue.value() - 1))
+        self.applyThreshold(cleared=True)
 
     # handle applying the threshold
-    def applyThreshold(self):
-        if self.imagePixLabel.imageArr is not None:
+    def applyThreshold(self, cleared=False):
+        if not cleared:
+            self.clearThreshAndPreview()
 
-            arr = threshF.applyThreshToArr(self.imagePixLabel.imageArr,
-                                           self.threshValue.value(),
-                                           self.gOLIterationsValue.value(),
-                                           self.gOLFactorValue.value())
-            self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
-            self.threshPixLabel.setImageArr(arr)
-
-            self.threshAndPreviewClear = False
-
-        # take focus away from the text fields
-        self.setFocus()
+        arr = threshF.applyThreshToArr(self.imagePixLabel.imageArr,
+                                        self.threshValue.value(),
+                                        self.gOLIterationsValue.value(),
+                                        self.gOLFactorValue.value())
+        self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
+        self.threshPixLabel.setImageArr(arr)
     
     # handle the preview button press
     def onPreviewClicked(self):
-        if not self.threshAndPreviewClear:
+        if self.fileName:
             self.previewPixLabel.setPixmap(tiffF.pixFromArr(
                     cFD.curveFitData(self.imagePixLabel.imageArr, 
                                  self.threshPixLabel.imageArr)))
     
     # handle the add data button press
     def onAddDataClicked(self):
-        if not self.threshAndPreviewClear:
+        if self.fileName:
             data = (cFD.curveFitData(self.imagePixLabel.imageArr,
                                      self.threshPixLabel.imageArr,
                                      False))
@@ -272,14 +263,13 @@ class MainWindow(QMainWindow):
     # handle the toss data button press
     def onTossDataClicked(self):
         tossedFrame = self.frameValue.value()
-        if (tossedFrame not in self.tossedFrames 
-                and not self.threshAndPreviewClear):
+        if (tossedFrame not in self.tossedFrames and self.fileName):
             self.tossedFrames.append(tossedFrame)
             self.tossedFrames.sort()
             self.dataTableModel.addTossedRow(tossedFrame)
             self.onAddDataClicked() # this follows previous lab standard
 
-        if self.fileName and not self.threshAndPreviewClear:
+        if self.fileName:
             self.frameValue.setValue(tossedFrame + 1)
     
     # write the data to a textfile
@@ -307,10 +297,9 @@ class MainWindow(QMainWindow):
     
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
-        if not self.threshAndPreviewClear:
+        if self.fileName:
             self.threshPixLabel.setPixmap(tiffF.defaultPix())
             self.previewPixLabel.setPixmap(tiffF.defaultPix())
-            self.threshAndPreviewClear = True
         
 # QLabel for keeping the contained pixmap scaled correctly
 class PixLabel(QLabel):
