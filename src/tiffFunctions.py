@@ -60,3 +60,11 @@ def defaultPix():
     array = np.arange(0, 100, 1, np.uint8)
     array = np.reshape(array, (10, 10)) 
     return pixFromArr(array)
+
+# returns a black array with a white X for thresholds with no objects
+def threshXArr():
+    array = np.zeros((100,100))
+    for i in range(1, 99):
+        array[i - 1 : i + 2, i - 1 : i + 2] = 1
+        array[99 - i - 1 : 99 - i + 2, i - 1 : i + 2] = 1
+    return array

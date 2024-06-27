@@ -2,6 +2,7 @@ import numpy as np
 from scipy.ndimage import rotate
 from scipy.integrate import quad
 from scipy.optimize import curve_fit
+import tiffFunctions as tiffF
 
 # define a constant
 DATA_NAMES = ("Pole Separation (px)", "Arc Length (px)", "Area Metric (px^2)",
@@ -32,8 +33,9 @@ def curveFitData(imageArr, arr, preview=True):
                 c2[count] = c
                 count += 1
     
-    # FIXME - totalPoints is zero when image is completely dark
-    # which results in c2[0] being an invalid call
+    # Return a white X if there are no points left after thresholding
+    if totalPoints == 0:
+        return tiffF.threshXArr()
     
     # CHECK EACH POINT AND SORT INTO OBJECTS
 
