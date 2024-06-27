@@ -91,6 +91,8 @@ class MainWindow(QMainWindow):
                           self.previewPixLabel)
         
         imageSplitter = QSplitter()
+        rightSplitter = QSplitter()
+        rightSplitter.setOrientation(Qt.Vertical)
 
         # create section titles with modified font
         importTitle = QLabel("Import")
@@ -113,7 +115,6 @@ class MainWindow(QMainWindow):
         # create container widgets and layouts
         centralWidget = QWidget()
         leftWidget = QWidget()
-        rightWidget = QWidget()
         importWidget = QWidget()
         thresholdWidget = QWidget()
         bottomLeftWidget = QWidget()
@@ -177,7 +178,6 @@ class MainWindow(QMainWindow):
                                alignment=Qt.AlignLeft | Qt.AlignBottom)
             tempHorizontal.setContentsMargins(0,0,0,0)
             tempHorizontal.addWidget(imagePixLabels[i], alignment=Qt.AlignLeft)
-            tempHorizontal.addStretch()
             tempImageWidget.setLayout(tempHorizontal)
             tempHorizontal = QHBoxLayout()
             tempVertical.addWidget(tempImageWidget)
@@ -191,23 +191,19 @@ class MainWindow(QMainWindow):
         tempVertical.addWidget(imagesTitle)
         tempVertical.addWidget(imageSplitter)
         tempVertical.addStretch()
-        tempVertical.setContentsMargins(0,0,0,0)
         imageSplitterWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
         tempVertical.addWidget(tableTitle)
         tempVertical.addWidget(self.dataTableView)
-        tempVertical.setContentsMargins(0,0,0,0)
         dataTableWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
 
-        tempVertical.addWidget(imageSplitterWidget)
-        tempVertical.addWidget(dataTableWidget, stretch=1)
-        rightWidget.setLayout(tempVertical)
-        tempVertical = QVBoxLayout()
+        rightSplitter.addWidget(imageSplitterWidget)
+        rightSplitter.addWidget(dataTableWidget)
 
         tempHorizontal.addWidget(leftWidget)
         tempHorizontal.addWidget(dividingLine)
-        tempHorizontal.addWidget(rightWidget)
+        tempHorizontal.addWidget(rightSplitter, stretch=1)
         centralWidget.setLayout(tempHorizontal)
         tempHorizontal = QHBoxLayout()
 
@@ -387,7 +383,7 @@ class PixLabel(QLabel):
 
         imgPolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.setSizePolicy(imgPolicy)
-        self.setMinimumSize(75, 25)
+        self.setMinimumSize(75, 75)
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
         self.setLineWidth(2)
     
