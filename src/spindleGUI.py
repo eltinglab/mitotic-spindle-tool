@@ -2,8 +2,8 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                              QSpinBox, QTableView, QWidget, QVBoxLayout,
                              QHBoxLayout, QGridLayout, QSizePolicy,
-                             QFileDialog, QSplitter, QFrame)
-from PySide6.QtGui import QPixmap, QColor
+                             QFileDialog, QSplitter, QFrame, QSpacerItem)
+from PySide6.QtGui import QPixmap, QColor, QFont
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
 import threshFunctions as threshF
@@ -30,7 +30,6 @@ class MainWindow(QMainWindow):
         # create accessible widgets
         self.importLabel = QLabel("Single Z")
         self.tiffButton = QPushButton(".tiff")
-        self.tiffButton.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
 
         self.totalFrameLabel = QLabel("# of Frames")
         self.totalFrameValue = QLabel("0")
@@ -100,14 +99,16 @@ class MainWindow(QMainWindow):
         imagesTitle = QLabel("Images")
         tableTitle = QLabel("Data")
 
-        titleFont = importTitle.font()
-        titleFont.setPointSize(int(titleFont.pointSize() * 1.5))
+        sectionTitles = (importTitle, thresholdTitle, dataTitle,
+                  imagesTitle, tableTitle)
 
-        importTitle.setFont(titleFont)
-        thresholdTitle.setFont(titleFont)
-        dataTitle.setFont(titleFont)
-        imagesTitle.setFont(titleFont)
-        tableTitle.setFont(titleFont)
+        titleFont = importTitle.font()
+        titleFont.setCapitalization(QFont.AllUppercase)
+
+        for title in sectionTitles:
+            # change the font and look of the titles
+            title.setStyleSheet("color:#777777")
+            title.setFont(titleFont)
 
         # create container widgets and layouts
         centralWidget = QWidget()
@@ -119,6 +120,10 @@ class MainWindow(QMainWindow):
         imageWidget = QWidget()
         thresholdImageWidget = QWidget()
         previewImageWidget = QWidget()
+        dataTableWidget = QWidget()
+
+        titleSpacer = QSpacerItem(self.tossButton.sizeHint().width(),
+                                  self.tossButton.sizeHint().height())
 
         dividingLine = QFrame()
         dividingLine.setFrameStyle(QFrame.VLine | QFrame.Raised)
@@ -138,6 +143,7 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         tempVertical.addWidget(importWidget)
 
+        tempVertical.addItem(titleSpacer)
         tempVertical.addWidget(thresholdTitle)
         tempGrid.addWidget(self.totalFrameLabel, 0, 0)
         tempGrid.addWidget(self.totalFrameValue, 0, 1, Qt.AlignRight)
@@ -153,6 +159,7 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         tempVertical.addWidget(thresholdWidget)
 
+        tempVertical.addItem(titleSpacer)
         tempVertical.addWidget(dataTitle)
         tempGrid.addWidget(self.addButton, 0, 0)
         tempGrid.addWidget(self.previewButton, 0, 1)
@@ -187,15 +194,14 @@ class MainWindow(QMainWindow):
         tempVertical.setContentsMargins(0,0,0,0)
         imageSplitterWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
-        dataTableWidget = QWidget()
         tempVertical.addWidget(tableTitle)
         tempVertical.addWidget(self.dataTableView)
         tempVertical.setContentsMargins(0,0,0,0)
         dataTableWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
 
-        tempVertical.addWidget(imageSplitterWidget, stretch=70)
-        tempVertical.addWidget(dataTableWidget, stretch=30)
+        tempVertical.addWidget(imageSplitterWidget)
+        tempVertical.addWidget(dataTableWidget, stretch=1)
         rightWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
 
