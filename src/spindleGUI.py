@@ -28,8 +28,8 @@ class MainWindow(QMainWindow):
         self.tossedFrames = []
 
         # create accessible widgets
-        self.importLabel = QLabel("Import")
-        self.tiffButton = QPushButton("Import .tiff")
+        self.importLabel = QLabel("Single Z")
+        self.tiffButton = QPushButton(".tiff")
         self.tiffButton.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
 
         self.totalFrameLabel = QLabel("# of Frames")
@@ -69,7 +69,7 @@ class MainWindow(QMainWindow):
                                            QSizePolicy.Maximum)
         self.exportButton = QPushButton("Export Data")
 
-        imageLabel = QLabel("Image")
+        imageLabel = QLabel("Source")
         imageMap = QPixmap(tiffF.defaultPix())
         self.imagePixLabel = PixLabel()
         self.imagePixLabel.setPixmap(imageMap)
@@ -93,6 +93,22 @@ class MainWindow(QMainWindow):
         
         imageSplitter = QSplitter()
 
+        # create section titles with modified font
+        importTitle = QLabel("Import")
+        thresholdTitle = QLabel("Threshold")
+        dataTitle = QLabel("Record")
+        imagesTitle = QLabel("Images")
+        tableTitle = QLabel("Data")
+
+        titleFont = importTitle.font()
+        titleFont.setPointSize(int(titleFont.pointSize() * 1.5))
+
+        importTitle.setFont(titleFont)
+        thresholdTitle.setFont(titleFont)
+        dataTitle.setFont(titleFont)
+        imagesTitle.setFont(titleFont)
+        tableTitle.setFont(titleFont)
+
         # create container widgets and layouts
         centralWidget = QWidget()
         leftWidget = QWidget()
@@ -104,6 +120,9 @@ class MainWindow(QMainWindow):
         thresholdImageWidget = QWidget()
         previewImageWidget = QWidget()
 
+        dividingLine = QFrame()
+        dividingLine.setFrameStyle(QFrame.VLine | QFrame.Raised)
+
         imageWidgets = (imageWidget, thresholdImageWidget, previewImageWidget)
 
         tempImageWidget = QWidget()
@@ -112,12 +131,14 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         
         # place widgets in the app
+        tempVertical.addWidget(importTitle)
         tempGrid.addWidget(self.importLabel, 0, 0)
         tempGrid.addWidget(self.tiffButton, 0, 1)
         importWidget.setLayout(tempGrid)
         tempGrid = QGridLayout()
         tempVertical.addWidget(importWidget)
-        tempVertical.addStretch() # add stretch spacer
+
+        tempVertical.addWidget(thresholdTitle)
         tempGrid.addWidget(self.totalFrameLabel, 0, 0)
         tempGrid.addWidget(self.totalFrameValue, 0, 1, Qt.AlignRight)
         tempGrid.addWidget(self.frameLabel, 1, 0)
@@ -131,13 +152,15 @@ class MainWindow(QMainWindow):
         thresholdWidget.setLayout(tempGrid)
         tempGrid = QGridLayout()
         tempVertical.addWidget(thresholdWidget)
-        tempVertical.addStretch() # add stretch spacer
+
+        tempVertical.addWidget(dataTitle)
         tempGrid.addWidget(self.addButton, 0, 0)
         tempGrid.addWidget(self.previewButton, 0, 1)
         tempGrid.addWidget(self.tossButton, 1, 0)
         tempGrid.addWidget(self.exportButton, 1, 1)
         bottomLeftWidget.setLayout(tempGrid)
         tempVertical.addWidget(bottomLeftWidget)
+        tempVertical.addStretch()
         tempGrid = QGridLayout()
         leftWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
@@ -157,12 +180,27 @@ class MainWindow(QMainWindow):
             tempVertical = QVBoxLayout()
             imageSplitter.addWidget(imageWidgets[i])
         
-        tempVertical.addWidget(imageSplitter, stretch=70)
-        tempVertical.addWidget(self.dataTableView, stretch=30)
+        imageSplitterWidget = QWidget()
+        tempVertical.addWidget(imagesTitle)
+        tempVertical.addWidget(imageSplitter)
+        tempVertical.addStretch()
+        tempVertical.setContentsMargins(0,0,0,0)
+        imageSplitterWidget.setLayout(tempVertical)
+        tempVertical = QVBoxLayout()
+        dataTableWidget = QWidget()
+        tempVertical.addWidget(tableTitle)
+        tempVertical.addWidget(self.dataTableView)
+        tempVertical.setContentsMargins(0,0,0,0)
+        dataTableWidget.setLayout(tempVertical)
+        tempVertical = QVBoxLayout()
+
+        tempVertical.addWidget(imageSplitterWidget, stretch=70)
+        tempVertical.addWidget(dataTableWidget, stretch=30)
         rightWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
 
         tempHorizontal.addWidget(leftWidget)
+        tempHorizontal.addWidget(dividingLine)
         tempHorizontal.addWidget(rightWidget)
         centralWidget.setLayout(tempHorizontal)
         tempHorizontal = QHBoxLayout()
@@ -198,7 +236,7 @@ class MainWindow(QMainWindow):
             self.setGeometry(qFrameRect.topLeft().x(),
                              qFrameRect.topLeft().y(),
                              xSize, ySize)
-        centerApplication(850, 400)
+        centerApplication(880, 450)
     
     # handle import .tiff button push
     def onInputTiffClicked(self):
