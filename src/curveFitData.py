@@ -174,7 +174,7 @@ def curveFitData(imageArr, arr, preview=True):
     if not preview:
         return calculateMeasurements(rotImg)
     else:
-        return rotImg
+        return plotOnSpindle(rotImg)
 
 def calculateMeasurements(spindleArray):
 
@@ -245,6 +245,68 @@ def calculateMeasurements(spindleArray):
     data = [poleSeparation, arcLength, areaCurve, maxCurve, avgCurve]
 
     return data
+
+def plotOnSpindle(spindleArray):
+
+    # FIT CURVE AND FIND POLES
+    numPoints = int(np.sum(spindleArray > 0.0))
+
+    rotX = np.zeros(numPoints, dtype=int)
+    rotY = np.zeros(numPoints, dtype=int)
+
+    rotHeight, rotWidth = spindleArray.shape
+
+    count = 0
+    for r in range(0, rotHeight):
+        for c in range(0, rotWidth):
+            if spindleArray[r,c] > 0:
+                rotX[count] = c
+                rotY[count] = r
+                count += 1
+    
+    def quadFunc(x, a, b, c):
+        return a * (x ** 2) + b * x + c
+
+    params, covariances  = curve_fit(quadFunc, rotX, rotY)
+    a, b, c = params[0], params[1], params[2]
+
+    minX = min(rotX)
+    maxX = max(rotX)
+
+    leftPole = [minX, int(quadFunc(minX, a, b, c))]
+    rightPole = [maxX, int(quadFunc(maxX, a, b, c))]
+
+    def spindleFunc(x):
+        return a * x**2 + b * x + c
+
+    fitXValues = np.linspace(minX, maxX, maxX - minX + 1, dtype=int)
+    fitYValues = np.zeros(fitXValues.shape, dtype=int)
+    for i, x in enumerate(fitXValues):
+        fitYValues[i] = int(spindleFunc(x))
+    
+    # use plotValue for plotting white (once the array is normalized)
+    plotValue = np.max(spindleArray)
+
+    # ~ half of the line thickness in pixels
+    hL = 0
+
+    for i in range(len(fitXValues)):
+        x = fitXValues[i]
+        y = fitYValues[i]
+        if int(i / 3) % 2 == 0:
+            spindleArray[y - hL : y + hL + 1, x - hL : x + hL + 1] = 0
+        else:
+            spindleArray[y - hL : y + hL + 1, x - hL : x + hL + 1] = plotValue
+
+    # half of the plotted square edge in pixels
+    hS = 2
+
+    spindleArray[leftPole[1] - hS : leftPole[1] + hS + 1,
+                 leftPole[0] - hS : leftPole[0] + hS + 1] = plotValue
+    spindleArray[rightPole[1] - hS : rightPole[1] + hS + 1,
+                 rightPole[0] - hS : rightPole[0] + hS + 1] = plotValue
+
+    return spindleArray
 
 # a class to represent threshold objects
 class thresholdObject():

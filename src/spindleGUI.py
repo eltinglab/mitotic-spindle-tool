@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
         self.threshValue.setSingleStep(100)
         self.threshValue.setMinimum(0)
         self.threshValue.setMaximum(65535)
+        self.threshValue.setValue(1000)
 
         self.gOLIterationsLabel = QLabel("GOL Iterations")
         self.gOLIterationsValue = QSpinBox()
@@ -208,7 +209,7 @@ class MainWindow(QMainWindow):
 
             # reset input values
             self.frameValue.setValue(1)
-            self.threshValue.setValue(0)
+            self.threshValue.setValue(1000)
             self.gOLIterationsValue.setValue(1)
             self.gOLFactorValue.setValue(4)
 
@@ -225,16 +226,17 @@ class MainWindow(QMainWindow):
         self.applyThreshold(cleared=True)
 
     # handle applying the threshold
-    def applyThreshold(self, cleared=False):
+    def applyThreshold(self, text="", cleared=False):
         if not cleared:
             self.clearThreshAndPreview()
 
-        arr = threshF.applyThreshToArr(self.imagePixLabel.imageArr,
-                                        self.threshValue.value(),
-                                        self.gOLIterationsValue.value(),
-                                        self.gOLFactorValue.value())
-        self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
-        self.threshPixLabel.setImageArr(arr)
+        if self.fileName:
+            arr = threshF.applyThreshToArr(self.imagePixLabel.imageArr,
+                                            self.threshValue.value(),
+                                            self.gOLIterationsValue.value(),
+                                            self.gOLFactorValue.value())
+            self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
+            self.threshPixLabel.setImageArr(arr)
     
     # handle the preview button press
     def onPreviewClicked(self):
