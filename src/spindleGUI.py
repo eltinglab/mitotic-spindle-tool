@@ -376,6 +376,9 @@ class PixLabel(QLabel):
         # allow the QLabel to initialize itself
         super().__init__()
 
+        # default size twice its minimum size
+        self.setGeometry(0, 0, 150, 150)
+
         # define a class pixmap variable
         self.pix = None
 
