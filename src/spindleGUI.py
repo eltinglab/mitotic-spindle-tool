@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
 import threshFunctions as threshF
 import curveFitData as cFD
+import plotSpindle as pS
 import numpy as np
 
 # subclass QMainWindow to create a custom MainWindow
@@ -299,16 +300,18 @@ class MainWindow(QMainWindow):
     # handle the preview button press
     def onPreviewClicked(self):
         if self.fileName:
-            self.previewPixLabel.setPixmap(tiffF.pixFromArr(
-                    cFD.curveFitData(self.imagePixLabel.imageArr, 
-                                 self.threshPixLabel.imageArr)))
+            self.previewPixLabel.setPixmap(
+                    pS.plotSpindle(
+                    cFD.spindlePlot(self.imagePixLabel.imageArr, 
+                                    self.threshPixLabel.imageArr)))
     
     # handle the add data button press
     def onAddDataClicked(self):
+        # FIXME: Data is added for over-thresholded custom X pixmap
+
         if self.fileName:
-            data = (cFD.curveFitData(self.imagePixLabel.imageArr,
-                                     self.threshPixLabel.imageArr,
-                                     False))
+            data = (cFD.spindleMeasurements(self.imagePixLabel.imageArr,
+                                            self.threshPixLabel.imageArr))
         
             # add the row of data to the data table
             self.dataTableModel.beginResetModel()
@@ -423,13 +426,15 @@ class GradientSplitterHandle(QSplitterHandle):
     # FIXME: the paint event or the QPainter is causing a bus error
     def paintEvent(self, event):
 
-        with QPainter(self) as painter:
-            # preset gradient:
-            gradientBrush = QBrush(QGradient.RiskyConcrete)
-            if self.orientation() == Qt.Horizontal:
-                gradientBrush.setTransform(QTransform().rotateRadians(-np.pi/2))
+        painter = QPainter()
+        painter.begin(self)
+        # preset gradient:
+        gradientBrush = QBrush(QGradient.RiskyConcrete)
+        if self.orientation() == Qt.Horizontal:
+            gradientBrush.setTransform(QTransform().rotateRadians(-np.pi/2))
 
-            painter.fillRect(self.rect(), gradientBrush)
+        painter.fillRect(self.rect(), gradientBrush)
+        painter.end()
 
 # BOILERPLATE TABLE MODEL
 class ImageTableModel(QAbstractTableModel):

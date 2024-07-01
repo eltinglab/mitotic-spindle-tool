@@ -8,8 +8,8 @@ import tiffFunctions as tiffF
 DATA_NAMES = ("Pole Separation (px)", "Arc Length (px)", "Area Metric (px^2)",
              "Max Curvature (px^-1)", "Avg Curvature (px^-1)")
 
-# using thresholded image, return the desired parameters
-def curveFitData(imageArr, arr, preview=True):
+# using thresholded image and main image, return the rotated spindle img
+def getSpindleImg(imageArr, arr):
 
     # create identical array for manipulation
     threshArr = np.zeros(shape=arr.shape)
@@ -173,12 +173,10 @@ def curveFitData(imageArr, arr, preview=True):
     rotAngle = - np.arctan(mainvector[0]/mainvector[1]) * 180 / np.pi
     rotImg = rotate(spindleImg, rotAngle, order=1)
     
-    if not preview:
-        return calculateMeasurements(rotImg)
-    else:
-        return plotOnSpindle(rotImg)
+    return rotImg
 
-def calculateMeasurements(spindleArray):
+def spindleMeasurements(imageArr, threshArr):
+    spindleArray = getSpindleImg(imageArr, threshArr)
 
     # FIT CURVE AND FIND POLES
     numPoints = int(np.sum(spindleArray > 0.0))
@@ -248,7 +246,8 @@ def calculateMeasurements(spindleArray):
 
     return data
 
-def plotOnSpindle(spindleArray):
+def spindlePlot(imageArr, threshArr):
+    spindleArray = getSpindleImg(imageArr, threshArr)
 
     # FIT CURVE AND FIND POLES
     numPoints = int(np.sum(spindleArray > 0.0))
@@ -274,41 +273,16 @@ def plotOnSpindle(spindleArray):
 
     minX = min(rotX)
     maxX = max(rotX)
-
-    leftPole = [minX, int(quadFunc(minX, a, b, c))]
-    rightPole = [maxX, int(quadFunc(maxX, a, b, c))]
+    centerX = (maxX - minX) / 2 + minX
 
     def spindleFunc(x):
         return a * x**2 + b * x + c
 
-    fitXValues = np.linspace(minX, maxX, maxX - minX + 1, dtype=int)
-    fitYValues = np.zeros(fitXValues.shape, dtype=int)
-    for i, x in enumerate(fitXValues):
-        fitYValues[i] = int(spindleFunc(x))
-    
-    # use plotValue for plotting white (once the array is normalized)
-    plotValue = np.max(spindleArray)
+    leftPole = (minX, spindleFunc(minX))
+    rightPole = (maxX, spindleFunc(maxX))
+    centerPoint = (centerX, spindleFunc(centerX))
 
-    # ~ half of the line thickness in pixels
-    hL = 0
-
-    for i in range(len(fitXValues)):
-        x = fitXValues[i]
-        y = fitYValues[i]
-        if int(i / 3) % 2 == 0:
-            spindleArray[y - hL : y + hL + 1, x - hL : x + hL + 1] = 0
-        else:
-            spindleArray[y - hL : y + hL + 1, x - hL : x + hL + 1] = plotValue
-
-    # half of the plotted square edge in pixels
-    hS = 2
-
-    spindleArray[leftPole[1] - hS : leftPole[1] + hS + 1,
-                 leftPole[0] - hS : leftPole[0] + hS + 1] = plotValue
-    spindleArray[rightPole[1] - hS : rightPole[1] + hS + 1,
-                 rightPole[0] - hS : rightPole[0] + hS + 1] = plotValue
-
-    return spindleArray
+    return (spindleArray, leftPole, rightPole, centerPoint)
 
 # a class to represent threshold objects
 class thresholdObject():
