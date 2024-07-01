@@ -1,9 +1,11 @@
 import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
-                             QSpinBox, QTableView, QWidget, QVBoxLayout,
-                             QHBoxLayout, QGridLayout, QSizePolicy,
-                             QFileDialog, QSplitter, QFrame, QSpacerItem)
-from PySide6.QtGui import QPixmap, QColor, QFont
+                               QSpinBox, QTableView, QWidget, QVBoxLayout,
+                               QHBoxLayout, QGridLayout, QSizePolicy,
+                               QFileDialog, QSplitter, QFrame, QSpacerItem,
+                               QSplitterHandle)
+from PySide6.QtGui import (QPixmap, QColor, QFont, QPainter, QBrush, QGradient,
+                           QTransform)
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
 import threshFunctions as threshF
@@ -90,9 +92,8 @@ class MainWindow(QMainWindow):
         imagePixLabels = (self.imagePixLabel, self.threshPixLabel, 
                           self.previewPixLabel)
         
-        imageSplitter = QSplitter()
-        rightSplitter = QSplitter()
-        rightSplitter.setOrientation(Qt.Vertical)
+        imageSplitter = SplitterWithHandles(Qt.Horizontal)
+        rightSplitter = SplitterWithHandles(Qt.Vertical)
 
         # create section titles with modified font
         importTitle = QLabel("Import")
@@ -260,7 +261,7 @@ class MainWindow(QMainWindow):
             # create the data array and place it in the QTableView
             self.dataTableArray = np.zeros((numFrames, len(cFD.DATA_NAMES)))
             self.dataTableModel = (
-                    imageTableModel(cFD.DATA_NAMES, self.dataTableArray))
+                    ImageTableModel(cFD.DATA_NAMES, self.dataTableArray))
             self.dataTableView.setModel(self.dataTableModel)
             self.dataTableView.resizeColumnsToContents()
 
@@ -403,8 +404,32 @@ class PixLabel(QLabel):
         self.setAlignment(Qt.AlignCenter)
         super().resizeEvent(event)
 
+# subclassed QSplitter to allow for custom handles
+class SplitterWithHandles(QSplitter):
+    def __init__(self, orientation):
+        super().__init__()
+        self.setOrientation(orientation)
+
+    def createHandle(self):
+        return GradientSplitterHandle(self.orientation(), self)
+
+# the custom splitter handle for a SplitterWithHandles
+# subclass idea from PySide6 documentation page for QSplitterHandle
+class GradientSplitterHandle(QSplitterHandle):
+
+    # FIXME: the paint event or the QPainter is causing a bus error
+    def paintEvent(self, event):
+
+        with QPainter(self) as painter:
+            # preset gradient:
+            gradientBrush = QBrush(QGradient.RiskyConcrete)
+            if self.orientation() == Qt.Horizontal:
+                gradientBrush.setTransform(QTransform().rotateRadians(-np.pi/2))
+
+            painter.fillRect(self.rect(), gradientBrush)
+
 # BOILERPLATE TABLE MODEL
-class imageTableModel(QAbstractTableModel):
+class ImageTableModel(QAbstractTableModel):
     def __init__(self, dataNames, data):
         super().__init__()
 
