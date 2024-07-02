@@ -415,6 +415,7 @@ class SplitterWithHandles(QSplitter):
     def __init__(self, orientation):
         super().__init__()
         self.setOrientation(orientation)
+        self.setHandleWidth(5)
 
     def createHandle(self):
         return GradientSplitterHandle(self.orientation(), self)
