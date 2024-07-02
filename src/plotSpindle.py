@@ -3,7 +3,7 @@ from PySide6.QtCore import QPoint, QPointF
 import tiffFunctions as tiffF
 
 # used for plotting the results of the curve fit onto the preview pixmap
-def plotSpindle(fitResults):
+def plotSpindle(fitResults, doesSpindleExist):
     spindleArray = fitResults[0]
     leftPole = fitResults[1]
     rightPole = fitResults[2]
@@ -12,6 +12,10 @@ def plotSpindle(fitResults):
     controlPoint = calculateBezierPoint(leftPole, centerPoint, rightPole)
 
     spindlePix = tiffF.pixFromArr(spindleArray)
+
+    # if there is no spindle, don't try to plot
+    if not doesSpindleExist:
+        return spindlePix
 
     painter = QPainter()
     painter.begin(spindlePix)

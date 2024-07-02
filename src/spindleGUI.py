@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
         self.threshLabel = QLabel("Threshold")
         self.threshValue = QSpinBox()
         self.threshValue.setAlignment(Qt.AlignRight)
-        self.threshValue.setSingleStep(100)
+        self.threshValue.setSingleStep(50)
         self.threshValue.setMinimum(0)
         self.threshValue.setMaximum(65535)
         self.threshValue.setValue(1000)
@@ -296,31 +296,34 @@ class MainWindow(QMainWindow):
     # handle the preview button press
     def onPreviewClicked(self):
         if self.fileName:
-            self.previewPixLabel.setPixmap(
-                    pS.plotSpindle(
+            spindlePlotData, doesSpindleExist = (
                     cFD.spindlePlot(self.imagePixLabel.imageArr, 
-                                    self.threshPixLabel.imageArr)))
+                                    self.threshPixLabel.imageArr))
+            self.previewPixLabel.setPixmap(pS.plotSpindle(spindlePlotData,
+                                                          doesSpindleExist))
+                    
     
     # handle the add data button press
     def onAddDataClicked(self):
-        # FIXME: Data is added for over-thresholded custom X pixmap
 
         if self.fileName:
-            data = (cFD.spindleMeasurements(self.imagePixLabel.imageArr,
+            data, doesSpindleExist = (cFD.spindleMeasurements(
+                                            self.imagePixLabel.imageArr,
                                             self.threshPixLabel.imageArr))
-        
-            # add the row of data to the data table
-            self.dataTableModel.beginResetModel()
-            frameIndex = self.frameValue.value() - 1
-            for i in range(len(data)):
-                self.dataTableArray[frameIndex, i] = data[i]
-            # update the table view
-            self.dataTableModel.endResetModel()
 
-            indexOfData = self.dataTableModel.createIndex(frameIndex, 0)
-            self.dataTableView.scrollTo(indexOfData)
+            if doesSpindleExist:
+                # add the row of data to the data table
+                self.dataTableModel.beginResetModel()
+                frameIndex = self.frameValue.value() - 1
+                for i in range(len(data)):
+                    self.dataTableArray[frameIndex, i] = data[i]
+                # update the table view
+                self.dataTableModel.endResetModel()
 
-            self.frameValue.setValue(frameIndex + 2)
+                indexOfData = self.dataTableModel.createIndex(frameIndex, 0)
+                self.dataTableView.scrollTo(indexOfData)
+
+                self.frameValue.setValue(frameIndex + 2)
     
     # handle the toss data button press
     def onTossDataClicked(self):
@@ -420,7 +423,6 @@ class SplitterWithHandles(QSplitter):
 # subclass idea from PySide6 documentation page for QSplitterHandle
 class GradientSplitterHandle(QSplitterHandle):
 
-    # FIXME: the paint event or the QPainter is causing a bus error
     def paintEvent(self, event):
 
         painter = QPainter()

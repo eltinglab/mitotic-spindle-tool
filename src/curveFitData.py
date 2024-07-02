@@ -35,7 +35,10 @@ def getSpindleImg(imageArr, arr):
     
     # Return a white X if there are no points left after thresholding
     if totalPoints == 0:
-        return tiffF.threshXArr()
+        doesSpindleExist = False
+        return tiffF.threshXArr(), doesSpindleExist
+    else:
+        doesSpindleExist = True
     
     # CHECK EACH POINT AND SORT INTO OBJECTS
 
@@ -135,8 +138,11 @@ def getSpindleImg(imageArr, arr):
 
         minDist = len(threshArr[0])
         for o in range(0, len(tObjects)):
-            if np.linalg.norm(np.array([xcen, ycen]) - np.array([tObjects[o].com])) < minDist and tObjects[o].numPoints > avgObjectSize:
-                minDist = np.linalg.norm(np.array([xcen, ycen]) - np.array([tObjects[o].com]))
+            if (np.linalg.norm(np.array([xcen, ycen]) 
+                    - np.array([tObjects[o].com])) < minDist
+                    and tObjects[o].numPoints > avgObjectSize):
+                minDist = np.linalg.norm(np.array([xcen, ycen])
+                                         - np.array([tObjects[o].com]))
                 centerObj = o
         
         spindle = tObjects[centerObj]
@@ -173,10 +179,14 @@ def getSpindleImg(imageArr, arr):
     rotAngle = - np.arctan(mainvector[0]/mainvector[1]) * 180 / np.pi
     rotImg = rotate(spindleImg, rotAngle, order=1)
     
-    return rotImg
+    return rotImg, doesSpindleExist
 
 def spindleMeasurements(imageArr, threshArr):
-    spindleArray = getSpindleImg(imageArr, threshArr)
+    spindleArray, doesSpindleExist = getSpindleImg(imageArr, threshArr)
+
+    # if spindle doesn't exist in the threshold, don't do calculations
+    if not doesSpindleExist:
+        return (0.0, 0.0, 0.0, 0.0, 0.0), doesSpindleExist
 
     # FIT CURVE AND FIND POLES
     numPoints = int(np.sum(spindleArray > 0.0))
@@ -244,10 +254,10 @@ def spindleMeasurements(imageArr, threshArr):
     # output data
     data = [poleSeparation, arcLength, areaCurve, maxCurve, avgCurve]
 
-    return data
+    return data, doesSpindleExist
 
 def spindlePlot(imageArr, threshArr):
-    spindleArray = getSpindleImg(imageArr, threshArr)
+    spindleArray, doesSpindleExist = getSpindleImg(imageArr, threshArr)
 
     # FIT CURVE AND FIND POLES
     numPoints = int(np.sum(spindleArray > 0.0))
@@ -282,7 +292,7 @@ def spindlePlot(imageArr, threshArr):
     rightPole = (maxX, spindleFunc(maxX))
     centerPoint = (centerX, spindleFunc(centerX))
 
-    return (spindleArray, leftPole, rightPole, centerPoint)
+    return (spindleArray, leftPole, rightPole, centerPoint), doesSpindleExist
 
 # a class to represent threshold objects
 class thresholdObject():
