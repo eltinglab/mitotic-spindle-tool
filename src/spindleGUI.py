@@ -333,6 +333,11 @@ class MainWindow(QMainWindow):
             self.tossedFrames.sort()
             self.dataTableModel.addTossedRow(tossedFrame)
             self.onAddDataClicked() # this follows previous lab standard
+        elif (tossedFrame in self.tossedFrames and self.fileName):
+            # "un-tosses" the frame
+            self.tossedFrames.remove(tossedFrame)
+            self.dataTableModel.removeTossedRow(tossedFrame)
+            self.onAddDataClicked()
 
         if self.fileName:
             self.frameValue.setValue(tossedFrame + 1)
@@ -446,6 +451,9 @@ class ImageTableModel(QAbstractTableModel):
 
     def addTossedRow(self, row):
         self._tossedRows.append(row)
+    
+    def removeTossedRow(self, row):
+        self._tossedRows.remove(row)
 
     def data(self, index, role):
         if role == Qt.DisplayRole:
