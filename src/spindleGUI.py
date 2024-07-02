@@ -2,8 +2,7 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                                QSpinBox, QTableView, QWidget, QVBoxLayout,
                                QHBoxLayout, QGridLayout, QSizePolicy,
-                               QFileDialog, QSplitter, QFrame, QSpacerItem,
-                               QSplitterHandle)
+                               QFileDialog, QSplitter, QFrame, QSplitterHandle)
 from PySide6.QtGui import (QPixmap, QColor, QFont, QPainter, QBrush, QGradient,
                            QTransform)
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel
@@ -125,9 +124,6 @@ class MainWindow(QMainWindow):
         previewImageWidget = QWidget()
         dataTableWidget = QWidget()
 
-        titleSpacer = QSpacerItem(self.tossButton.sizeHint().width(),
-                                  self.tossButton.sizeHint().height())
-
         dividingLine = QFrame()
         dividingLine.setFrameStyle(QFrame.VLine | QFrame.Raised)
 
@@ -146,7 +142,7 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         tempVertical.addWidget(importWidget)
 
-        tempVertical.addItem(titleSpacer)
+        tempVertical.addSpacing(self.tossButton.sizeHint().height())
         tempVertical.addWidget(thresholdTitle)
         tempGrid.addWidget(self.totalFrameLabel, 0, 0)
         tempGrid.addWidget(self.totalFrameValue, 0, 1, Qt.AlignRight)
@@ -162,7 +158,7 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         tempVertical.addWidget(thresholdWidget)
 
-        tempVertical.addItem(titleSpacer)
+        tempVertical.addSpacing(self.tossButton.sizeHint().height())
         tempVertical.addWidget(dataTitle)
         tempGrid.addWidget(self.addButton, 0, 0)
         tempGrid.addWidget(self.previewButton, 0, 1)
