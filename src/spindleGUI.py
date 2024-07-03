@@ -23,6 +23,9 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Mitotic Spindle Image Analysis")
         
+        # Update the version for new releases
+        versionNumber = "v1.0.0"
+        
         # keep track of the open file name
         self.fileName = None
 
@@ -113,6 +116,10 @@ class MainWindow(QMainWindow):
             title.setStyleSheet("color:#777777")
             title.setFont(titleFont)
 
+        # version number (could move this up to a menu in the future)
+        versionLabel = QLabel(versionNumber)
+        versionLabel.setStyleSheet("color:#777777")
+
         # create container widgets and layouts
         centralWidget = QWidget()
         leftWidget = QWidget()
@@ -167,6 +174,7 @@ class MainWindow(QMainWindow):
         bottomLeftWidget.setLayout(tempGrid)
         tempVertical.addWidget(bottomLeftWidget)
         tempVertical.addStretch()
+        tempVertical.addWidget(versionLabel)
         tempGrid = QGridLayout()
         leftWidget.setLayout(tempVertical)
         tempVertical = QVBoxLayout()
@@ -236,7 +244,7 @@ class MainWindow(QMainWindow):
             self.setGeometry(qFrameRect.topLeft().x(),
                              qFrameRect.topLeft().y(),
                              xSize, ySize)
-        centerApplication(880, 450)
+        centerApplication(770, 450)
     
     # handle import .tiff button push
     def onInputTiffClicked(self):
