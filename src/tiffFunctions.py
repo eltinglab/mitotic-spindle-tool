@@ -1,6 +1,6 @@
 from PIL import Image, ImageQt, ImageSequence
 from PySide6.QtGui import QPixmap
-import numpy as np
+from numpy import array, zeros, arange, reshape, uint8
 
 # returns the number of frames in a tiff image
 def framesInTiff(tiffFileName):
@@ -21,12 +21,12 @@ def arrFromTiff(tiffFileName, frameNum):
     im = ims[frameNum]
 
     # create the array
-    return np.array(im)
+    return array(im)
 
 # creates a normalized QPixmap from a numpy array
 def pixFromArr(arr):
     # normalize the array
-    temp = np.zeros(arr.shape, dtype = np.uint8)
+    temp = zeros(arr.shape, dtype = uint8)
     lowest = 100000
     highest = 0
     for i in range(0, arr.shape[0]):
@@ -57,15 +57,15 @@ def pixFromTiff(fileName, frameNum):
 
 # returns a grayscale pixmap
 def defaultPix():
-    array = np.arange(0, 100, 1, np.uint8)
-    array = np.reshape(array, (10, 10)) 
+    array = arange(0, 100, 1, uint8)
+    array = reshape(array, (10, 10)) 
     return pixFromArr(array)
 
 # returns a black array with a white X for thresholds with no objects
 def threshXArr():
     side = 100
     sM1 = side - 1
-    array = np.zeros((side,side))
+    array = zeros((side,side))
     for i in range(1, sM1):
         array[i - 1 : i + 2, i - 1 : i + 2] = 1
         array[sM1 - i - 1 : sM1 - i + 2, i - 1 : i + 2] = 1

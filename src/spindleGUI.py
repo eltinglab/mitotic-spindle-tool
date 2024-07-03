@@ -10,7 +10,7 @@ import tiffFunctions as tiffF
 import threshFunctions as threshF
 import curveFitData as cFD
 import plotSpindle as pS
-import numpy as np
+from numpy import zeros
 
 # subclass QMainWindow to create a custom MainWindow
 class MainWindow(QMainWindow):
@@ -256,7 +256,7 @@ class MainWindow(QMainWindow):
             self.totalFrameValue.setText(str(numFrames))
             
             # create the data array and place it in the QTableView
-            self.dataTableArray = np.zeros((numFrames, len(cFD.DATA_NAMES)))
+            self.dataTableArray = zeros((numFrames, len(cFD.DATA_NAMES)))
             self.dataTableModel = (
                     ImageTableModel(cFD.DATA_NAMES, self.dataTableArray))
             self.dataTableView.setModel(self.dataTableModel)
@@ -435,7 +435,7 @@ class GradientSplitterHandle(QSplitterHandle):
         # preset gradient:
         gradientBrush = QBrush(QGradient.RiskyConcrete)
         if self.orientation() == Qt.Horizontal:
-            gradientBrush.setTransform(QTransform().rotateRadians(-np.pi/2))
+            gradientBrush.setTransform(QTransform().rotate(-90))
 
         painter.fillRect(self.rect(), gradientBrush)
         painter.end()

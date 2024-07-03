@@ -1,7 +1,7 @@
 from PySide6.QtGui import QPainter, QPainterPath, QColorConstants, QPen
 from PySide6.QtCore import QPoint, QPointF
 import tiffFunctions as tiffF
-import numpy as np
+from numpy import zeros
 
 # used for plotting the results of the curve fit onto the preview pixmap
 def plotSpindle(fitResults, doesSpindleExist):
@@ -17,7 +17,7 @@ def plotSpindle(fitResults, doesSpindleExist):
     # skip all of this code if I decide to set the scale back to 1
     if sF > 1:
         height, width = spindleArray.shape
-        bigSpindleArray = np.zeros((height * sF, width * sF))
+        bigSpindleArray = zeros((height * sF, width * sF))
         for y in range(height):
             for x in range(width):
                 bigSpindleArray[sF * y : sF * y + sF,

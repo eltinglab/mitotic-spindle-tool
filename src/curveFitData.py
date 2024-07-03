@@ -1,4 +1,8 @@
-import numpy as np
+from numpy import zeros, array, arctan, pi, uint64
+from numpy import sum as npsum
+from numpy import mean as npmean
+from numpy import sqrt as npsqrt
+from numpy.linalg import norm, eig
 from scipy.ndimage import rotate
 from scipy.integrate import quad
 from scipy.optimize import curve_fit
@@ -12,17 +16,17 @@ DATA_NAMES = ("Pole Separation (px)", "Arc Length (px)", "Area Metric (px^2)",
 def getSpindleImg(imageArr, arr):
 
     # create identical array for manipulation
-    threshArr = np.zeros(shape=arr.shape)
+    threshArr = zeros(shape=arr.shape)
     for i in range(0, len(arr)):
         for j in range(0, len(arr[i])):
             threshArr[i,j] = arr[i,j]
     
     # count the number of points and preallocate vectors
-    totalPoints = int(np.sum(threshArr))
+    totalPoints = int(npsum(threshArr))
 
     # make these int type to avoid default double assignment later
-    c2 = np.zeros(totalPoints, dtype=int)
-    r2 = np.zeros(totalPoints, dtype=int)
+    c2 = zeros(totalPoints, dtype=int)
+    r2 = zeros(totalPoints, dtype=int)
     count = 0
 
     # list of all x's and y's
@@ -117,9 +121,9 @@ def getSpindleImg(imageArr, arr):
     
     # CENTER OF MASS OF EACH OBJECT
     for o in range(0, len(tObjects)):
-        mass = np.uint64(0)
-        xsum = np.uint64(0)
-        ysum = np.uint64(0)
+        mass = uint64(0)
+        xsum = uint64(0)
+        ysum = uint64(0)
         for i in range(0, tObjects[o].numPoints):
             yC = tObjects[o].yCoords[i]
             xC = tObjects[o].xCoords[i]
@@ -134,15 +138,15 @@ def getSpindleImg(imageArr, arr):
 
     if len(tObjects) > 1:
         numPointsArr = [getattr(o, "numPoints") for o in tObjects]
-        avgObjectSize = np.mean(numPointsArr)
+        avgObjectSize = npmean(numPointsArr)
 
         minDist = len(threshArr[0])
         for o in range(0, len(tObjects)):
-            if (np.linalg.norm(np.array([xcen, ycen]) 
-                    - np.array([tObjects[o].com])) < minDist
+            if (norm(array([xcen, ycen]) 
+                    - array([tObjects[o].com])) < minDist
                     and tObjects[o].numPoints > avgObjectSize):
-                minDist = np.linalg.norm(np.array([xcen, ycen])
-                                         - np.array([tObjects[o].com]))
+                minDist = norm(array([xcen, ycen])
+                                         - array([tObjects[o].com]))
                 centerObj = o
         
         spindle = tObjects[centerObj]
@@ -150,7 +154,7 @@ def getSpindleImg(imageArr, arr):
         spindle = tObjects[0]
     
     # create array with only the spindle object
-    spindleArr = np.zeros(threshArr.shape)
+    spindleArr = zeros(threshArr.shape)
     for i in range(0, spindle.numPoints):
         spindleArr[spindle.yCoords[i], spindle.xCoords[i]] = 1
     
@@ -168,15 +172,15 @@ def getSpindleImg(imageArr, arr):
             Iyy += spindleArr[y,x] * ((y - spindle.com[1]) ** 2)
             Ixy += spindleArr[y,x] * (x - spindle.com[0]) * (y - spindle.com[1])
 
-    tensorMat = np.array([[Ixx, Ixy],
+    tensorMat = array([[Ixx, Ixy],
                           [Ixy, Iyy]])
 
     # CALCULATE EIGENVECTORS AND ROTATE THE SPINDLE
-    eigenValues, eigenVectors = np.linalg.eig(tensorMat)
+    eigenValues, eigenVectors = eig(tensorMat)
     tempIndex = list(eigenValues).index(min(eigenValues))
     mainvector = eigenVectors[:,tempIndex]
 
-    rotAngle = - np.arctan(mainvector[0]/mainvector[1]) * 180 / np.pi
+    rotAngle = - arctan(mainvector[0]/mainvector[1]) * 180 / pi
     rotImg = rotate(spindleImg, rotAngle, order=1)
     
     return rotImg, doesSpindleExist
@@ -189,10 +193,10 @@ def spindleMeasurements(imageArr, threshArr):
         return (0.0, 0.0, 0.0, 0.0, 0.0), doesSpindleExist
 
     # FIT CURVE AND FIND POLES
-    numPoints = int(np.sum(spindleArray > 0.0))
+    numPoints = int(npsum(spindleArray > 0.0))
 
-    rotX = np.zeros(numPoints)
-    rotY = np.zeros(numPoints)
+    rotX = zeros(numPoints)
+    rotY = zeros(numPoints)
 
     rotHeight, rotWidth = spindleArray.shape
 
@@ -219,11 +223,11 @@ def spindleMeasurements(imageArr, threshArr):
     # POLE SEPARATION
     params, covariances = curve_fit(lambda x, a, b: a * x + b, rotX, rotY)
     a2 = params[0]
-    poleSeparation = np.sqrt(a2**2 + 1) * (maxX - minX)
+    poleSeparation = npsqrt(a2**2 + 1) * (maxX - minX)
 
     # ARC LENGTH
     def arcFunc(t):
-        return np.sqrt(4 * a**2 * t**2 + 4 * a * b * t + b**2 + 1)
+        return npsqrt(4 * a**2 * t**2 + 4 * a * b * t + b**2 + 1)
     arcLength = quad(arcFunc, minX, maxX)[0]
     
     # CURVATURE
@@ -260,10 +264,10 @@ def spindlePlot(imageArr, threshArr):
     spindleArray, doesSpindleExist = getSpindleImg(imageArr, threshArr)
 
     # FIT CURVE AND FIND POLES
-    numPoints = int(np.sum(spindleArray > 0.0))
+    numPoints = int(npsum(spindleArray > 0.0))
 
-    rotX = np.zeros(numPoints, dtype=int)
-    rotY = np.zeros(numPoints, dtype=int)
+    rotX = zeros(numPoints, dtype=int)
+    rotY = zeros(numPoints, dtype=int)
 
     rotHeight, rotWidth = spindleArray.shape
 

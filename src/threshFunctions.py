@@ -1,4 +1,4 @@
-import numpy as np
+from numpy import sum as npsum
 
 # applies a threshold to an image array
 def applyThreshToArr(arr, thresh, gOLI, gOLF):
@@ -20,7 +20,7 @@ def applyThreshToArr(arr, thresh, gOLI, gOLF):
     for i in range(0, gOLIterations):
         for r in range(1, len(output) - 1):
             for c in range(1, len(output[r]) - 1):
-                if (np.sum(output[r-1:r+2, c-1:c+2]) < gOLFactor):
+                if (npsum(output[r-1:r+2, c-1:c+2]) < gOLFactor):
                     output[r][c] = False
 
     return output
