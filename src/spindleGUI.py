@@ -12,13 +12,6 @@ import curveFitData as cFD
 import plotSpindle as pS
 from numpy import zeros
 
-# create and display the application
-def main():
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    app.exec()
-
 # subclass QMainWindow to create a custom MainWindow
 class MainWindow(QMainWindow):
 
@@ -488,3 +481,10 @@ class ImageTableModel(QAbstractTableModel):
 
             if orientation == Qt.Vertical:
                 return str(section + 1)
+
+# create and display the application if this file is being run
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    app.exec()
