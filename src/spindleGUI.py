@@ -262,6 +262,9 @@ class MainWindow(QMainWindow):
             self.dataTableView.setModel(self.dataTableModel)
             self.dataTableView.resizeColumnsToContents()
 
+            # reset the tossed frames for the new image
+            self.tossedFrames = []
+
             # reset input values
             self.frameValue.setValue(1)
             self.threshValue.setValue(1000)
@@ -273,11 +276,9 @@ class MainWindow(QMainWindow):
         self.clearThreshAndPreview()
 
         self.imagePixLabel.setPixmap(
-                tiffF.pixFromTiff(self.fileName,
-                                    self.frameValue.value() - 1))
+                tiffF.pixFromTiff(self.fileName, self.frameValue.value() - 1))
         self.imagePixLabel.setImageArr(
-                tiffF.arrFromTiff(self.fileName,
-                                    self.frameValue.value() - 1))
+                tiffF.arrFromTiff(self.fileName, self.frameValue.value() - 1))
         self.applyThreshold(cleared=True)
 
     # handle applying the threshold
@@ -383,8 +384,11 @@ class PixLabel(QLabel):
         # allow the QLabel to initialize itself
         super().__init__()
 
+        # adjustable side unit length of label
+        self.side = 80
+
         # default size twice its minimum size
-        self.setGeometry(0, 0, 150, 150)
+        self.setGeometry(0, 0, 2 * self.side, 2 * self.side)
 
         # define a class pixmap variable
         self.pix = None
@@ -394,7 +398,7 @@ class PixLabel(QLabel):
 
         imgPolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.setSizePolicy(imgPolicy)
-        self.setMinimumSize(75, 75)
+        self.setMinimumSize(self.side, self.side)
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
         self.setLineWidth(2)
     
@@ -403,14 +407,26 @@ class PixLabel(QLabel):
         self.imageArr = arr
 
     # scale pixmap to label w and h, keeping pixmap aspect ratio
-    def setPixmap(self, pix):
+    def setPixmap(self, pix, isNewPix = True):
+
+        # if a new pixmap is applied, adjust the minimum size of the
+        # label so that the frame always stays flush with the pixmap
+        # goal is for longest dimension to be minimum self.side
+        if isNewPix:
+            hOverW = pix.size().height() / pix.size().width()
+            if hOverW < 1: # wide images
+                self.setMinimumSize(self.side, int(self.side * hOverW))
+            elif hOverW > 1: # tall images
+                self.setMinimumSize(int(self.side / hOverW), self.side)
+            else: # square images
+                self.setMinimumSize(self.side, self.side)
         self.pix = pix
         scaled = pix.scaled(self.size(), Qt.KeepAspectRatio)
         super().setPixmap(scaled)
     
     # rescale the pixmap when the label is resized
     def resizeEvent(self, event):
-        self.setPixmap(self.pix)
+        self.setPixmap(self.pix, False)
         self.setAlignment(Qt.AlignCenter)
         super().resizeEvent(event)
 
