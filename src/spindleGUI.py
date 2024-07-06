@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                                QAbstractItemView)
 from PySide6.QtGui import (QPixmap, QFont, QPainter, QBrush, QGradient,
                            QTransform)
-from PySide6.QtCore import Qt, QSize, QDir, QAbstractTableModel
+from PySide6.QtCore import Qt, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
 import threshFunctions as threshF
 import curveFitData as cFD
