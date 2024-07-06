@@ -124,7 +124,7 @@ class MainWindow(QMainWindow):
 
         # set default size hint for buttons and spacing
         # based off of QButton with the text "Toss Frame Data"
-        defaultSize = QSize(95, 24)
+        defaultSize = QPushButton("Toss Frame Data").sizeHint()
 
         # create container widgets and layouts
         centralWidget = QWidget()
