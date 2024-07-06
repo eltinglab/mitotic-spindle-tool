@@ -2,10 +2,11 @@ import sys
 from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                                QSpinBox, QTableView, QWidget, QVBoxLayout,
                                QHBoxLayout, QGridLayout, QSizePolicy,
-                               QFileDialog, QSplitter, QFrame, QSplitterHandle)
-from PySide6.QtGui import (QPixmap, QColor, QFont, QPainter, QBrush, QGradient,
+                               QFileDialog, QSplitter, QFrame, QSplitterHandle,
+                               QAbstractItemView)
+from PySide6.QtGui import (QPixmap, QFont, QPainter, QBrush, QGradient,
                            QTransform)
-from PySide6.QtCore import Qt, QDir, QAbstractTableModel
+from PySide6.QtCore import Qt, QSize, QDir, QAbstractTableModel
 import tiffFunctions as tiffF
 import threshFunctions as threshF
 import curveFitData as cFD
@@ -67,11 +68,11 @@ class MainWindow(QMainWindow):
         self.gOLFactorValue.setValue(4)
 
         self.previewButton = QPushButton("Preview")
-        self.addButton = QPushButton("Add Frame Data")
-        self.tossButton = QPushButton("Toss Frame Data")
+        self.addButton = QPushButton("Add")
+        self.tossButton = QPushButton("Toss")
         self.tossButton.setSizePolicy(QSizePolicy.Maximum,
                                            QSizePolicy.Maximum)
-        self.exportButton = QPushButton("Export Data")
+        self.exportButton = QPushButton("Export")
 
         imageLabel = QLabel("Source")
         imageMap = QPixmap(tiffF.defaultPix())
@@ -89,6 +90,7 @@ class MainWindow(QMainWindow):
         self.previewPixLabel.setPixmap(previewMap)
 
         self.dataTableView = QTableView()
+        self.dataTableView.setSelectionMode(QAbstractItemView.NoSelection)
         self.dataTableArray = None
 
         imageLabels = (imageLabel, thresholdImageLabel, previewImageLabel)
@@ -120,6 +122,10 @@ class MainWindow(QMainWindow):
         versionLabel = QLabel(versionNumber)
         versionLabel.setStyleSheet("color:#777777")
 
+        # set default size hint for buttons and spacing
+        # based off of QButton with the text "Toss Frame Data"
+        defaultSize = QSize(95, 24)
+
         # create container widgets and layouts
         centralWidget = QWidget()
         leftWidget = QWidget()
@@ -149,7 +155,7 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         tempVertical.addWidget(importWidget)
 
-        tempVertical.addSpacing(self.tossButton.sizeHint().height())
+        tempVertical.addSpacing(defaultSize.height())
         tempVertical.addWidget(thresholdTitle)
         tempGrid.addWidget(self.totalFrameLabel, 0, 0)
         tempGrid.addWidget(self.totalFrameValue, 0, 1, Qt.AlignRight)
@@ -165,7 +171,7 @@ class MainWindow(QMainWindow):
         tempGrid = QGridLayout()
         tempVertical.addWidget(thresholdWidget)
 
-        tempVertical.addSpacing(self.tossButton.sizeHint().height())
+        tempVertical.addSpacing(defaultSize.height())
         tempVertical.addWidget(dataTitle)
         tempGrid.addWidget(self.addButton, 0, 0)
         tempGrid.addWidget(self.previewButton, 0, 1)
@@ -216,11 +222,11 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(centralWidget)
 
         # set fixed button sizes
-        self.tiffButton.setFixedSize(self.tossButton.sizeHint())
-        self.previewButton.setFixedSize(self.tossButton.sizeHint())
-        self.addButton.setFixedSize(self.tossButton.sizeHint())
-        self.tossButton.setFixedSize(self.tossButton.sizeHint())
-        self.exportButton.setFixedSize(self.tossButton.sizeHint())
+        self.tiffButton.setFixedSize(defaultSize)
+        self.previewButton.setFixedSize(defaultSize)
+        self.addButton.setFixedSize(defaultSize)
+        self.tossButton.setFixedSize(defaultSize)
+        self.exportButton.setFixedSize(defaultSize)
         
         # connect signals to slots
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
@@ -443,7 +449,7 @@ class SplitterWithHandles(QSplitter):
     def __init__(self, orientation):
         super().__init__()
         self.setOrientation(orientation)
-        self.setHandleWidth(5)
+        self.setHandleWidth(4)
 
     def createHandle(self):
         return GradientSplitterHandle(self.orientation(), self)
@@ -457,7 +463,7 @@ class GradientSplitterHandle(QSplitterHandle):
         painter = QPainter()
         painter.begin(self)
         # preset gradient:
-        gradientBrush = QBrush(QGradient.RiskyConcrete)
+        gradientBrush = QBrush(QGradient.HeavyRain)
         if self.orientation() == Qt.Horizontal:
             gradientBrush.setTransform(QTransform().rotate(-90))
 
@@ -487,9 +493,9 @@ class ImageTableModel(QAbstractTableModel):
                 return "%.4f" % self._data[index.row(), index.column()]
         if role == Qt.TextAlignmentRole:
             return Qt.AlignVCenter + Qt.AlignRight
-        if role == Qt.ForegroundRole:
+        if role == Qt.BackgroundRole:
             if (index.row() + 1) in self._tossedRows:
-                return QColor("red")
+                return QBrush(Qt.darkGray)
     
     def rowCount(self, index):
         return self._data.shape[0]
