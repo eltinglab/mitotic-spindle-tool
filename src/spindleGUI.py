@@ -463,7 +463,7 @@ class GradientSplitterHandle(QSplitterHandle):
         painter = QPainter()
         painter.begin(self)
         # preset gradient:
-        gradientBrush = QBrush(QGradient.HeavyRain)
+        gradientBrush = QBrush(QGradient.RiskyConcrete)
         if self.orientation() == Qt.Horizontal:
             gradientBrush.setTransform(QTransform().rotate(-90))
 
