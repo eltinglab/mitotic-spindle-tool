@@ -1,6 +1,6 @@
 from PIL import Image, ImageQt, ImageSequence
 from PySide6.QtGui import QPixmap
-from numpy import array, zeros, arange, reshape, uint8
+from numpy import array, zeros, ones, reshape, uint8
 
 # returns the number of frames in a tiff image
 def framesInTiff(tiffFileName):
@@ -56,10 +56,11 @@ def pixFromTiff(fileName, frameNum):
     return pixFromArr(arrFromTiff(fileName, frameNum))
 
 # returns a grayscale pixmap
-def defaultPix():
-    array = arange(0, 100, 1, uint8)
-    array = reshape(array, (10, 10)) 
-    return pixFromArr(array)
+def defaultPix(isDarkMode):
+    array = ones(4, dtype=uint8)
+    array = reshape(array, (2, 2))
+    array *= (25 if isDarkMode else 245)
+    return threshPixFromArr(array)
 
 # returns a black array with a white X for thresholds with no objects
 def threshXArr():

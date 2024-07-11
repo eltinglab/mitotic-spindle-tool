@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
                                QAbstractItemView)
 from PySide6.QtGui import (QPixmap, QFont, QPainter, QBrush, QGradient,
                            QTransform)
-from PySide6.QtCore import Qt, QDir, QAbstractTableModel
+from PySide6.QtCore import Qt, QDir, QAbstractTableModel, QEvent
 import tiffFunctions as tiffF
 import threshFunctions as threshF
 import curveFitData as cFD
@@ -25,13 +25,22 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Mitotic Spindle Image Analysis")
         
         # Update the version for new releases
-        versionNumber = "v1.0.0"
+        versionNumber = "v1.0.0-dev"
         
         # keep track of the open file name
         self.fileName = None
 
         # bad frames reported by the user
         self.tossedFrames = []
+
+        # record whether it is starting in light or dark mode
+        aLabel = QLabel("a")
+        self.isDarkMode = (
+                aLabel.palette().color(aLabel.backgroundRole()).black() 
+                > aLabel.palette().color(aLabel.foregroundRole()).black())
+        
+        # keep track of whether the preview is the default or not
+        self.isPreviewCleared = True
 
         # create accessible widgets
         self.importLabel = QLabel("Single Z")
@@ -75,17 +84,17 @@ class MainWindow(QMainWindow):
         self.exportButton = QPushButton("Export")
 
         imageLabel = QLabel("Source")
-        imageMap = QPixmap(tiffF.defaultPix())
+        imageMap = QPixmap(tiffF.defaultPix(self.isDarkMode))
         self.imagePixLabel = PixLabel()
         self.imagePixLabel.setPixmap(imageMap)
 
         thresholdImageLabel = QLabel("Threshold")
-        threshMap = QPixmap(tiffF.defaultPix())
+        threshMap = QPixmap(tiffF.defaultPix(self.isDarkMode))
         self.threshPixLabel = PixLabel()
         self.threshPixLabel.setPixmap(threshMap)
 
         previewImageLabel = QLabel("Preview")
-        previewMap = QPixmap(tiffF.defaultPix())
+        previewMap = QPixmap(tiffF.defaultPix(self.isDarkMode))
         self.previewPixLabel = PixLabel()
         self.previewPixLabel.setPixmap(previewMap)
 
@@ -316,7 +325,7 @@ class MainWindow(QMainWindow):
                                     self.threshPixLabel.imageArr))
             self.previewPixLabel.setPixmap(pS.plotSpindle(spindlePlotData,
                                                           doesSpindleExist))
-                    
+            self.isPreviewCleared = False
     
     # handle the add data button press
     def onAddDataClicked(self):
@@ -386,8 +395,31 @@ class MainWindow(QMainWindow):
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
         if self.fileName:
-            self.threshPixLabel.setPixmap(tiffF.defaultPix())
-            self.previewPixLabel.setPixmap(tiffF.defaultPix())
+            self.threshPixLabel.setPixmap(tiffF.defaultPix(self.isDarkMode))
+            self.previewPixLabel.setPixmap(tiffF.defaultPix(self.isDarkMode))
+            self.isPreviewCleared = True
+
+    # changes default pixmap color when computer switches color mode
+    def changeDefaultPixmaps(self):
+        newPix = tiffF.defaultPix(self.isDarkMode)
+        if self.fileName and self.isPreviewCleared:
+            # image and thresh have images but not preview
+            self.previewPixLabel.setPixmap(newPix)
+        elif not self.fileName:
+            # no image is loaded (all three images are defaults)
+            self.imagePixLabel.setPixmap(newPix)
+            self.threshPixLabel.setPixmap(newPix)
+            self.previewPixLabel.setPixmap(newPix)
+
+    # detects when the computer switches to dark or light mode
+    def changeEvent(self, event):
+        if event.type() == QEvent.ThemeChange:
+            if self.isDarkMode:
+                self.isDarkMode = False
+            else:
+                self.isDarkMode = True
+            self.changeDefaultPixmaps()
+        super().changeEvent(event)
         
 # QLabel for keeping the contained pixmap scaled correctly
 class PixLabel(QLabel):
