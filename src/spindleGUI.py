@@ -84,20 +84,20 @@ class MainWindow(QMainWindow):
         self.dataTableView.setSelectionMode(QAbstractItemView.NoSelection)
         self.dataTableArray = None
 
-        backShade = self.dataTableView.palette().base().color().value()
+        self.backShade = self.dataTableView.palette().base().color().value()
 
         imageLabel = QLabel("Source")
-        imageMap = QPixmap(tiffF.defaultPix(backShade))
+        imageMap = QPixmap(tiffF.defaultPix(self.backShade))
         self.imagePixLabel = PixLabel()
         self.imagePixLabel.setPixmap(imageMap)
 
         thresholdImageLabel = QLabel("Threshold")
-        threshMap = QPixmap(tiffF.defaultPix(backShade))
+        threshMap = QPixmap(tiffF.defaultPix(self.backShade))
         self.threshPixLabel = PixLabel()
         self.threshPixLabel.setPixmap(threshMap)
 
         previewImageLabel = QLabel("Preview")
-        previewMap = QPixmap(tiffF.defaultPix(backShade))
+        previewMap = QPixmap(tiffF.defaultPix(self.backShade))
         self.previewPixLabel = PixLabel()
         self.previewPixLabel.setPixmap(previewMap)
 
@@ -394,14 +394,14 @@ class MainWindow(QMainWindow):
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
         if self.fileName:
-            self.threshPixLabel.setPixmap(tiffF.defaultPix(self.isDarkMode))
-            self.previewPixLabel.setPixmap(tiffF.defaultPix(self.isDarkMode))
+            self.threshPixLabel.setPixmap(tiffF.defaultPix(self.backShade))
+            self.previewPixLabel.setPixmap(tiffF.defaultPix(self.backShade))
             self.isPreviewCleared = True
 
     # changes default pixmap color when computer switches color mode
     def changeDefaultPixmaps(self):
-        backShade = QTableView().palette().base().color().value()
-        newPix = tiffF.defaultPix(backShade)
+        self.backShade = QTableView().palette().base().color().value()
+        newPix = tiffF.defaultPix(self.backShade)
         if self.fileName and self.isPreviewCleared:
             # image and thresh have images but not preview
             self.previewPixLabel.setPixmap(newPix)
