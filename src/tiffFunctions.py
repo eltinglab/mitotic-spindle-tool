@@ -56,10 +56,10 @@ def pixFromTiff(fileName, frameNum):
     return pixFromArr(arrFromTiff(fileName, frameNum))
 
 # returns a grayscale pixmap
-def defaultPix(isDarkMode):
+def defaultPix(backShade):
     array = ones(4, dtype=uint8)
     array = reshape(array, (2, 2))
-    array *= (25 if isDarkMode else 245)
+    array *= backShade
     return threshPixFromArr(array)
 
 # returns a black array with a white X for thresholds with no objects

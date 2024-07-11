@@ -25,7 +25,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Mitotic Spindle Image Analysis")
         
         # Update the version for new releases
-        versionNumber = "v1.0.0-dev"
+        versionNumber = "v1.0.0"
         
         # keep track of the open file name
         self.fileName = None
@@ -34,10 +34,7 @@ class MainWindow(QMainWindow):
         self.tossedFrames = []
 
         # record whether it is starting in light or dark mode
-        aLabel = QLabel("a")
-        self.isDarkMode = (
-                aLabel.palette().color(aLabel.backgroundRole()).black() 
-                > aLabel.palette().color(aLabel.foregroundRole()).black())
+        self.isDarkMode = self.isComputerDarkMode()   
         
         # keep track of whether the preview is the default or not
         self.isPreviewCleared = True
@@ -83,24 +80,26 @@ class MainWindow(QMainWindow):
                                            QSizePolicy.Maximum)
         self.exportButton = QPushButton("Export")
 
+        self.dataTableView = QTableView()
+        self.dataTableView.setSelectionMode(QAbstractItemView.NoSelection)
+        self.dataTableArray = None
+
+        backShade = self.dataTableView.palette().base().color().value()
+
         imageLabel = QLabel("Source")
-        imageMap = QPixmap(tiffF.defaultPix(self.isDarkMode))
+        imageMap = QPixmap(tiffF.defaultPix(backShade))
         self.imagePixLabel = PixLabel()
         self.imagePixLabel.setPixmap(imageMap)
 
         thresholdImageLabel = QLabel("Threshold")
-        threshMap = QPixmap(tiffF.defaultPix(self.isDarkMode))
+        threshMap = QPixmap(tiffF.defaultPix(backShade))
         self.threshPixLabel = PixLabel()
         self.threshPixLabel.setPixmap(threshMap)
 
         previewImageLabel = QLabel("Preview")
-        previewMap = QPixmap(tiffF.defaultPix(self.isDarkMode))
+        previewMap = QPixmap(tiffF.defaultPix(backShade))
         self.previewPixLabel = PixLabel()
         self.previewPixLabel.setPixmap(previewMap)
-
-        self.dataTableView = QTableView()
-        self.dataTableView.setSelectionMode(QAbstractItemView.NoSelection)
-        self.dataTableArray = None
 
         imageLabels = (imageLabel, thresholdImageLabel, previewImageLabel)
         imagePixLabels = (self.imagePixLabel, self.threshPixLabel, 
@@ -401,7 +400,8 @@ class MainWindow(QMainWindow):
 
     # changes default pixmap color when computer switches color mode
     def changeDefaultPixmaps(self):
-        newPix = tiffF.defaultPix(self.isDarkMode)
+        backShade = QTableView().palette().base().color().value()
+        newPix = tiffF.defaultPix(backShade)
         if self.fileName and self.isPreviewCleared:
             # image and thresh have images but not preview
             self.previewPixLabel.setPixmap(newPix)
@@ -410,15 +410,20 @@ class MainWindow(QMainWindow):
             self.imagePixLabel.setPixmap(newPix)
             self.threshPixLabel.setPixmap(newPix)
             self.previewPixLabel.setPixmap(newPix)
+    
+    # determines if the application is in dark mode
+    def isComputerDarkMode(self):
+        aLabel = QLabel("a")
+        return (aLabel.palette().color(aLabel.backgroundRole()).black() 
+              > aLabel.palette().color(aLabel.foregroundRole()).black())
 
     # detects when the computer switches to dark or light mode
     def changeEvent(self, event):
         if event.type() == QEvent.ThemeChange:
-            if self.isDarkMode:
-                self.isDarkMode = False
-            else:
-                self.isDarkMode = True
-            self.changeDefaultPixmaps()
+            isComputerDarkMode = self.isComputerDarkMode()
+            if isComputerDarkMode != self.isDarkMode:
+                self.isDarkMode = isComputerDarkMode
+                self.changeDefaultPixmaps()
         super().changeEvent(event)
         
 # QLabel for keeping the contained pixmap scaled correctly
