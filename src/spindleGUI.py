@@ -578,10 +578,9 @@ class MainWindow(QMainWindow):
             
     # Handle clicks on data table
     def onDataTableClicked(self, index):
-        if index.column() == 0:  # If the leftmost column (index) was clicked
-            # Navigate to that frame
-            frame = index.row() + 1  # Convert from 0-based to 1-based index
-            self.frameValue.setValue(frame)
+        # Navigate to that frame regardless of which column was clicked
+        frame = index.row() + 1  # Convert from 0-based to 1-based index
+        self.frameValue.setValue(frame)
             
     # Handle clicks on column headers in the data table
     def onColumnHeaderClicked(self, column_index):
