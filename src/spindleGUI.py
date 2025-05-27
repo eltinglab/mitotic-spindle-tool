@@ -13,6 +13,7 @@ import curveFitData as cFD
 import plotSpindle as pS
 import plotDialog as pD
 import manualSpindleDialog as mSD
+import spindlePreviewDialog as sPD
 import os
 from numpy import zeros, arange
 import matplotlib.pyplot as plt
@@ -99,6 +100,7 @@ class MainWindow(QMainWindow):
         self.addButton = QPushButton("Add")
         self.tossButton = QPushButton("Toss")
         self.previewButton = QPushButton("Preview")
+        self.coordPreviewButton = QPushButton("Coord Preview")
         self.manualButton = QPushButton("Manual Override")
         
         self.tossButton.setSizePolicy(QSizePolicy.Maximum,
@@ -114,7 +116,7 @@ class MainWindow(QMainWindow):
         self.dataTableArray = None
         
         # Hotkeys information
-        self.hotkeysLabel = QLabel("Hotkeys: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iter ±1 | A/D GOL Factor ±1 | Space Preview | M Manual | E Export")
+        self.hotkeysLabel = QLabel("Hotkeys: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iter ±1 | A/D GOL Factor ±1 | Space Preview | C Coord Preview | M Manual | E Export")
         self.hotkeysLabel.setWordWrap(True)
         self.hotkeysLabel.setStyleSheet("color: #777777; font-size: 9pt;")
 
@@ -218,9 +220,10 @@ class MainWindow(QMainWindow):
         tempGrid.addWidget(self.addButton, 0, 0)
         tempGrid.addWidget(self.tossButton, 0, 1)
         tempGrid.addWidget(self.previewButton, 1, 0)
-        tempGrid.addWidget(self.manualButton, 1, 1)
-        tempGrid.addWidget(self.runAllFramesButton, 2, 0)
-        tempGrid.addWidget(self.exportButton, 2, 1)
+        tempGrid.addWidget(self.coordPreviewButton, 1, 1)
+        tempGrid.addWidget(self.manualButton, 2, 0)
+        tempGrid.addWidget(self.runAllFramesButton, 3, 0)
+        tempGrid.addWidget(self.exportButton, 3, 1)
         bottomLeftWidget.setLayout(tempGrid)
         tempVertical.addWidget(bottomLeftWidget)
         tempVertical.addWidget(self.hotkeysLabel)
@@ -269,6 +272,7 @@ class MainWindow(QMainWindow):
         # set fixed button sizes
         self.tiffButton.setFixedSize(defaultSize)
         self.previewButton.setFixedSize(defaultSize)
+        self.coordPreviewButton.setFixedSize(defaultSize)
         self.manualButton.setFixedSize(defaultSize)
         self.addButton.setFixedSize(defaultSize)
         self.tossButton.setFixedSize(defaultSize)
@@ -284,6 +288,7 @@ class MainWindow(QMainWindow):
         self.gOLFactorValue.textChanged.connect(self.applyThreshold)
 
         self.previewButton.clicked.connect(self.onPreviewClicked)
+        self.coordPreviewButton.clicked.connect(self.onCoordPreviewClicked)
         self.manualButton.clicked.connect(self.onManualOverrideClicked)
         self.addButton.clicked.connect(self.onAddDataClicked)
         self.tossButton.clicked.connect(self.onTossDataClicked)
@@ -390,6 +395,36 @@ class MainWindow(QMainWindow):
             self.imagePixLabel.setPixmap(originalWithOverlay, False)
             
             self.isPreviewCleared = False
+    
+    # handle the coordinate preview button press
+    def onCoordPreviewClicked(self):
+        if self.fileName:
+            if self.manual_override_active:
+                # Use manual pole positions to create preview with original coordinates
+                spindlePlotData, doesSpindleExist, originalCoords = cFD.spindlePlotManualWithOriginalCoords(
+                    self.imagePixLabel.imageArr,
+                    self.threshPixLabel.imageArr,
+                    self.manual_left_pole,
+                    self.manual_right_pole
+                )
+            else:
+                # Use automatic detection with original coordinates
+                spindlePlotData, doesSpindleExist, originalCoords = cFD.spindlePlotWithOriginalCoords(
+                    self.imagePixLabel.imageArr, 
+                    self.threshPixLabel.imageArr
+                )
+            
+            if doesSpindleExist:
+                # Create and show the coordinate preview dialog
+                preview_dialog = sPD.SpindlePreviewDialog(
+                    self,
+                    self.imagePixLabel.imageArr,
+                    originalCoords
+                )
+                preview_dialog.exec()
+            else:
+                # Could add a message box here to inform user no spindle was detected
+                pass
     
     # handle manual override button press
     def onManualOverrideClicked(self):
@@ -599,6 +634,9 @@ class MainWindow(QMainWindow):
         elif event.key() == Qt.Key_Space:
             # Space - Preview (same as Preview button)
             self.onPreviewClicked()
+        elif event.key() == Qt.Key_C:
+            # C - Coordinate preview (same as Coord Preview button)
+            self.onCoordPreviewClicked()
         elif event.key() == Qt.Key_M:
             # M - Manual override
             self.onManualOverrideClicked()

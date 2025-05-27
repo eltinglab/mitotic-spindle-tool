@@ -1,4 +1,4 @@
-from numpy import zeros, array, arctan, pi, uint64
+from numpy import zeros, array, arctan, pi, uint64, cos, sin
 from numpy import sum as npsum
 from numpy import mean as npmean
 from numpy import sqrt as npsqrt
@@ -12,7 +12,231 @@ import tiffFunctions as tiffF
 DATA_NAMES = ("Pole Separation (px)", "Arc Length (px)", "Area Metric (px^2)",
              "Max Curvature (px^-1)", "Avg Curvature (px^-1)")
 
-# using thresholded image and main image, return the rotated spindle img
+def transformCoordinatesBackToOriginal(rotatedCoords, transformInfo):
+    """
+    Transform coordinates from rotated/processed space back to original image space
+    
+    Args:
+        rotatedCoords: tuple of (x, y) coordinates in rotated space
+        transformInfo: dictionary containing transformation parameters
+    
+    Returns:
+        tuple of (x, y) coordinates in original image space
+    """
+    if transformInfo is None:
+        return rotatedCoords
+    
+    rot_x, rot_y = rotatedCoords
+    
+    # Get transformation parameters
+    com = transformInfo['com']  # Center of mass in original image
+    rotAngle = transformInfo['rotAngle']  # Rotation angle in degrees
+    processed_center_x = transformInfo['processed_center_x']
+    processed_center_y = transformInfo['processed_center_y']
+    
+    # Convert rotation angle to radians
+    angle_rad = rotAngle * pi / 180
+    
+    # Step 1: Translate to center of rotated image
+    centered_x = rot_x - processed_center_x
+    centered_y = rot_y - processed_center_y
+    
+    # Step 2: Apply inverse rotation
+    cos_angle = cos(-angle_rad)
+    sin_angle = sin(-angle_rad)
+    
+    unrotated_x = centered_x * cos_angle - centered_y * sin_angle
+    unrotated_y = centered_x * sin_angle + centered_y * cos_angle
+    
+    # Step 3: Translate back to original coordinate system
+    original_x = unrotated_x + com[0]
+    original_y = unrotated_y + com[1]
+    
+    return (original_x, original_y)
+
+def getSpindleImgWithTransform(imageArr, arr):
+    """
+    Enhanced version of getSpindleImg that also returns transformation information
+    needed to map coordinates back to the original image space
+    """
+
+    # create identical array for manipulation
+    threshArr = zeros(shape=arr.shape)
+    for i in range(0, len(arr)):
+        for j in range(0, len(arr[i])):
+            threshArr[i,j] = arr[i,j]
+    
+    # count the number of points and preallocate vectors
+    totalPoints = int(npsum(threshArr))
+
+    # make these int type to avoid default double assignment later
+    c2 = zeros(totalPoints, dtype=int)
+    r2 = zeros(totalPoints, dtype=int)
+    count = 0
+
+    # list of all x's and y's
+    for r in range(0, len(threshArr)):
+        for c in range(0, len(threshArr[r])):
+            if threshArr[r,c] == 1:
+                r2[count] = r
+                c2[count] = c
+                count += 1
+    
+    # Return a white X if there are no points left after thresholding
+    if totalPoints == 0:
+        doesSpindleExist = False
+        return tiffF.threshXArr(), doesSpindleExist, None
+    else:
+        doesSpindleExist = True
+    
+    # CHECK EACH POINT AND SORT INTO OBJECTS
+
+    # start object list with one object
+    tObjects = [thresholdObject(c2[0], r2[0])]
+
+    # go through each image point
+    for i in range(0, len(c2)):
+        noMatch = True
+
+        # go through each existing object
+        o = 0
+        while noMatch and o < len(tObjects):
+
+            # check each point in the object until it finds a neighbor
+            # or goes through all of them
+            j = len(tObjects[o].xCoords) - 1
+            while noMatch and j >= 0:
+
+                # if it finds a neighbor, add it to the object
+                if (abs(tObjects[o].xCoords[j] - c2[i]) <= 2
+                        and abs(tObjects[o].yCoords[j] - r2[i]) <= 2):
+                    tObjects[o].addPoint(c2[i], r2[i])
+                    noMatch = False
+                else:
+                    # go to next point
+                    j -= 1
+            
+            o += 1
+        
+        # if it goes through all objects without a match,
+        # make a new object
+        if noMatch:
+            tObjects.append(thresholdObject(c2[i], r2[i]))
+
+    # CONSOLIDATE OBJECTS
+
+    # this needs to compare every point on an object with every other
+    # point on other objects (not really EVERY point)
+
+    # sort the objects array from most points to least
+    tObjects.sort(reverse=True)
+
+    # set startLength != len(tObjects) to enter the loop
+    startLength = len(tObjects) + 1
+
+    while startLength != len(tObjects):
+
+        startLength = len(tObjects)
+
+        o1 = 0
+        while o1 < len(tObjects): # going through objects
+            o2 = o1 + 1
+            
+            while o2 < len(tObjects): # comparing with other objects
+                noMatch = True
+                i = len(tObjects[o1].xCoords) - 1 # every point in o1
+
+                while noMatch and i >= 0:
+                    temp1 = tObjects[o2].xCoords
+                    temp2 = tObjects[o2].yCoords
+                    coordTrunc = ((abs(temp1-tObjects[o1].xCoords[i]) < 10)
+                                * (abs(temp2-tObjects[o1].yCoords[i]) < 10))
+
+                    if sum(coordTrunc) > 0:
+                        # if any o1 points are within a radius of 10 of
+                        # any o2 points, consolidate objects
+                        # remove o2 from tObjects
+                        noMatch = False
+                        tObjects[o1].addPoints(temp1, temp2)
+                        tObjects.pop(o2)
+                    
+                    i -= 1
+                o2 += 1
+            o1 += 1
+    
+    # CENTER OF MASS OF EACH OBJECT
+    for o in range(0, len(tObjects)):
+        mass = uint64(0)
+        xsum = uint64(0)
+        ysum = uint64(0)
+        for i in range(0, tObjects[o].numPoints):
+            yC = tObjects[o].yCoords[i]
+            xC = tObjects[o].xCoords[i]
+            mass += imageArr[yC, xC]
+            ysum += imageArr[yC, xC] * tObjects[o].yCoords[i]
+            xsum += imageArr[yC, xC] * tObjects[o].xCoords[i]
+        tObjects[o].com = [xsum/mass, ysum/mass]
+    
+    # FIND SPINDLE AUTOMATICALLY
+    xcen = len(threshArr[0]) / 2
+    ycen = len(threshArr) / 2
+
+    if len(tObjects) > 1:
+        numPointsArr = [getattr(o, "numPoints") for o in tObjects]
+        avgObjectSize = npmean(numPointsArr)
+
+        minDist = len(threshArr[0])
+        for o in range(0, len(tObjects)):
+            if (norm(array([xcen, ycen]) 
+                    - array([tObjects[o].com])) < minDist
+                    and tObjects[o].numPoints > avgObjectSize):
+                minDist = norm(array([xcen, ycen])
+                                         - array([tObjects[o].com]))
+                centerObj = o
+        
+        spindle = tObjects[centerObj]
+    else:
+        spindle = tObjects[0]
+    
+    # create array with only the spindle object
+    spindleArr = zeros(threshArr.shape)
+    for i in range(0, spindle.numPoints):
+        spindleArr[spindle.yCoords[i], spindle.xCoords[i]] = 1
+    
+    # multiply original image by the one we just made
+    spindleImg = imageArr * spindleArr
+
+    # FIND MOMENT OF INERTIA VECTORS
+    Ixx = 0
+    Iyy = 0
+    Ixy = 0
+
+    for y in range(0, len(spindleArr)):
+        for x in range(0, len(spindleArr[y])):
+            Ixx += spindleArr[y,x] * ((x - spindle.com[0]) ** 2)
+            Iyy += spindleArr[y,x] * ((y - spindle.com[1]) ** 2)
+            Ixy += spindleArr[y,x] * (x - spindle.com[0]) * (y - spindle.com[1])
+
+    tensorMat = array([[Ixx, Ixy],
+                          [Ixy, Iyy]])
+
+    # CALCULATE EIGENVECTORS AND ROTATE THE SPINDLE
+    eigenValues, eigenVectors = eig(tensorMat)
+    tempIndex = list(eigenValues).index(min(eigenValues))
+    mainvector = eigenVectors[:,tempIndex]
+
+    rotAngle = - arctan(mainvector[0]/mainvector[1]) * 180 / pi
+    rotImg = rotate(spindleImg, rotAngle, order=1)
+    
+    transformInfo = {
+        'com': spindle.com,
+        'rotAngle': rotAngle,
+        'processed_center_x': xcen,
+        'processed_center_y': ycen
+    }
+    
+    return rotImg, doesSpindleExist, transformInfo
+
 def getSpindleImg(imageArr, arr):
 
     # create identical array for manipulation
@@ -183,7 +407,14 @@ def getSpindleImg(imageArr, arr):
     rotAngle = - arctan(mainvector[0]/mainvector[1]) * 180 / pi
     rotImg = rotate(spindleImg, rotAngle, order=1)
     
-    return rotImg, doesSpindleExist
+    transformInfo = {
+        'com': spindle.com,
+        'rotAngle': rotAngle,
+        'processed_center_x': xcen,
+        'processed_center_y': ycen
+    }
+    
+    return rotImg, doesSpindleExist, transformInfo
 
 def spindleMeasurements(imageArr, threshArr):
     spindleArray, doesSpindleExist = getSpindleImg(imageArr, threshArr)
@@ -415,6 +646,67 @@ def spindlePlotManual(imageArr, threshArr, leftPole, rightPole):
     centerPoint = ((leftPole[0] + rightPole[0]) / 2, (leftPole[1] + rightPole[1]) / 2)
     
     return (spindleArray, leftPole, rightPole, centerPoint), doesSpindleExist
+
+def spindlePlotManualWithOriginalCoords(imageArr, threshArr, leftPole, rightPole):
+    """
+    Manual version that returns coordinates in original space
+    """
+    # Since manual coordinates are already in original space, no transformation needed
+    centerPoint = ((leftPole[0] + rightPole[0]) / 2, (leftPole[1] + rightPole[1]) / 2)
+    
+    return (imageArr, leftPole, rightPole, centerPoint), True, None
+
+def spindlePlotWithOriginalCoords(imageArr, threshArr):
+    """
+    Enhanced version of spindlePlot that returns spindle end coordinates 
+    in the original coordinate space
+    """
+    # Get spindle array and transformation info
+    spindleArray, doesSpindleExist, transformInfo = getSpindleImgWithTransform(imageArr, threshArr)
+    
+    if not doesSpindleExist:
+        return (spindleArray, (0, 0), (0, 0), (0, 0)), doesSpindleExist, None
+    
+    # FIT CURVE AND FIND POLES in rotated space
+    numPoints = int(npsum(spindleArray > 0.0))
+    
+    rotX = zeros(numPoints, dtype=int)
+    rotY = zeros(numPoints, dtype=int)
+    
+    rotHeight, rotWidth = spindleArray.shape
+    
+    count = 0
+    for r in range(0, rotHeight):
+        for c in range(0, rotWidth):
+            if spindleArray[r,c] > 0:
+                rotX[count] = c
+                rotY[count] = r
+                count += 1
+    
+    def quadFunc(x, a, b, c):
+        return a * (x ** 2) + b * x + c
+    
+    params, covariances = curve_fit(quadFunc, rotX, rotY)
+    a, b, c = params[0], params[1], params[2]
+    
+    minX = min(rotX)
+    maxX = max(rotX)
+    centerX = (maxX - minX) / 2 + minX
+    
+    def spindleFunc(x):
+        return a * x**2 + b * x + c
+    
+    # Get poles in rotated space
+    leftPole_rotated = (minX, spindleFunc(minX))
+    rightPole_rotated = (maxX, spindleFunc(maxX))
+    centerPoint_rotated = (centerX, spindleFunc(centerX))
+    
+    # Transform coordinates back to original space
+    leftPole_original = transformCoordinatesBackToOriginal(leftPole_rotated, transformInfo)
+    rightPole_original = transformCoordinatesBackToOriginal(rightPole_rotated, transformInfo)
+    centerPoint_original = transformCoordinatesBackToOriginal(centerPoint_rotated, transformInfo)
+    
+    return (imageArr, leftPole_original, rightPole_original, centerPoint_original), doesSpindleExist, transformInfo
 
 # a class to represent threshold objects
 class thresholdObject():
