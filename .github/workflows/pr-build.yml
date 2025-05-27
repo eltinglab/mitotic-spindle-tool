@@ -124,8 +124,10 @@ jobs:
       run: |
         cd dist
         if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          # Windows - create ZIP with executable and launcher
           powershell -command "Compress-Archive -Path '${{ matrix.executable }}', 'run-mitotic-spindle-tool.bat' -DestinationPath 'mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.zip'"
         else
+          # Linux/macOS - create tar.gz with executable and launcher  
           tar -czf mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
         fi
         cd ..
@@ -135,7 +137,10 @@ jobs:
       with:
         name: pr-${{ needs.pr-info.outputs.pr_number }}-${{ matrix.platform }}-build
         path: |
+          dist/${{ matrix.executable }}
+          dist/run-mitotic-spindle-tool.*
           dist/mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.*
+          dist/mitotic-spindle-tool-${{ matrix.platform }}.tar.gz
           dist/mitotic-spindle-tool.AppImage
           build_report.md
         retention-days: 30
@@ -164,12 +169,19 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
+          const runId = context.runId;
+          const repo = context.repo;
+          const artifactsUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId}`;
+          const commit = context.payload.pull_request.head.sha.slice(0, 7);
+          
           // Collect all build reports
-          let comment = `## Build Results for PR #${{ needs.pr-info.outputs.pr_number }}\n\n`;
-          comment += `**PR Title**: ${{ needs.pr-info.outputs.pr_title }}\n\n`;
+          let comment = `## 🛠️ Build Results for PR #${{ needs.pr-info.outputs.pr_number }}\n\n`;
+          comment += `**PR Title**: ${{ needs.pr-info.outputs.pr_title }}\n`;
+          comment += `**Commit**: \`${commit}\`\n\n`;
           
           const platforms = ['linux', 'windows', 'macos'];
           let allBuildsSuccessful = true;
+          let artifactNames = [];
           
           for (const platform of platforms) {
             const reportPath = path.join('build-reports', `build-report-${platform}`, 'build_report.md');
@@ -180,6 +192,8 @@ jobs:
               
               if (reportContent.includes('[ERROR]')) {
                 allBuildsSuccessful = false;
+              } else {
+                artifactNames.push(`pr-${{ needs.pr-info.outputs.pr_number }}-${platform}-build`);
               }
             } else {
               comment += `## Build Results for ${platform}\n**[ERROR]** **Build failed** - No report generated\n\n`;
@@ -188,18 +202,17 @@ jobs:
           }
           
           if (allBuildsSuccessful) {
-            comment += `## [SUCCESS] Summary\nAll builds completed successfully!\n\n`;
+            comment += `## ✅ Summary\nAll builds completed successfully!\n\n`;
+            comment += `🛠️ **Download build artifacts [here](${artifactsUrl})** from the workflow run.\n\n`;
+            comment += `**Available artifacts**:\n`;
+            for (const artifact of artifactNames) {
+              comment += `- **${artifact}**\n`;
+            }
+            comment += `\n*Built from commit \`${commit}\`. Artifacts are retained for 30 days.*`;
           } else {
-            comment += `## [ERROR] Summary\nSome builds failed. Please check the logs above.\n\n`;
+            comment += `## ❌ Summary\nSome builds failed. Please check the logs above.\n\n`;
+            comment += `🔗 [View workflow details](${artifactsUrl}) for more information.`;
           }
-          
-          comment += `### 📥 Download Artifacts\n`;
-          comment += `Build artifacts are available for download from the "Artifacts" section of this workflow run.\n\n`;
-          comment += `**Available packages**:\n`;
-          comment += `- \`pr-${{ needs.pr-info.outputs.pr_number }}-linux-build\`\n`;
-          comment += `- \`pr-${{ needs.pr-info.outputs.pr_number }}-windows-build\`\n`;
-          comment += `- \`pr-${{ needs.pr-info.outputs.pr_number }}-macos-build\`\n\n`;
-          comment += `*Artifacts are retained for 30 days.*`;
           
           // Post the comment
           await github.rest.issues.createComment({
