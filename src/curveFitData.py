@@ -298,6 +298,124 @@ def spindlePlot(imageArr, threshArr):
 
     return (spindleArray, leftPole, rightPole, centerPoint), doesSpindleExist
 
+def spindleMeasurementsManual(imageArr, threshArr, leftPole, rightPole):
+    """
+    Calculate spindle measurements using manually specified pole positions
+    """
+    import numpy as np
+    from scipy.integrate import quad
+    
+    # POLE SEPARATION (Euclidean distance)
+    poleSeparation = np.sqrt((rightPole[0] - leftPole[0])**2 + 
+                           (rightPole[1] - leftPole[1])**2)
+    
+    # ARC LENGTH (for manual override, approximate as straight line)
+    arcLength = poleSeparation
+    
+    # For area and curvature, we need to fit a curve through the actual spindle pixels
+    # Get the rotated spindle for pixel analysis
+    spindleArray, doesSpindleExist = getSpindleImg(imageArr, threshArr)
+    
+    if not doesSpindleExist:
+        return [0.0, 0.0, 0.0, 0.0, 0.0], False
+    
+    try:
+        # Get spindle pixels for analysis
+        numPoints = int(npsum(spindleArray > 0.0))
+        
+        if numPoints == 0:
+            return [poleSeparation, arcLength, 0.0, 0.0, 0.0], True
+        
+        rotX = zeros(numPoints)
+        rotY = zeros(numPoints)
+        
+        rotHeight, rotWidth = spindleArray.shape
+        
+        count = 0
+        for r in range(0, rotHeight):
+            for c in range(0, rotWidth):
+                if spindleArray[r,c] > 0:
+                    rotX[count] = c
+                    rotY[count] = r
+                    count += 1
+        
+        # Fit a quadratic curve through the detected pixels
+        def quadFunc(x, a, b, c):
+            return a * (x ** 2) + b * x + c
+        
+        params, covariances = curve_fit(quadFunc, rotX, rotY)
+        a, b, c = params[0], params[1], params[2]
+        
+        # Use manual poles for endpoints but automatic curve for area calculation
+        minX = min(leftPole[0], rightPole[0])
+        maxX = max(leftPole[0], rightPole[0])
+        
+        # AREA METRIC (difference between manual line and detected curve)
+        def spindleFunc(x):
+            return a * x**2 + b * x + c
+        
+        x1 = leftPole[0]
+        x2 = rightPole[0]
+        y1 = leftPole[1]
+        y2 = rightPole[1]
+        
+        if x2 != x1:  # Avoid division by zero
+            m1 = (y2 - y1) / (x2 - x1)
+            
+            def poleFunc(x):
+                return m1 * (x - x1) + y1
+            
+            try:
+                areaCurve = abs(quad(poleFunc, x1, x2)[0] - quad(spindleFunc, x1, x2)[0])
+            except:
+                areaCurve = 0.0
+        else:
+            areaCurve = 0.0
+        
+        # CURVATURE METRICS (based on detected curve, not manual line)
+        maxCurve = abs(2*a) if a != 0 else 0.0
+        
+        def curvatureFunc(x):
+            if (4 * a**2 * x**2 + 4 * a * b * x + b**2 + 1) > 0:
+                return (2 * a) / ((4 * a**2 * x**2 + 4 * a * b * x + b**2 + 1)**(3/2))
+            else:
+                return 0.0
+        
+        try:
+            if x2 != x1:
+                avgCurve = abs(quad(curvatureFunc, x1, x2)[0] / (x2 - x1))
+            else:
+                avgCurve = 0.0
+        except:
+            avgCurve = 0.0
+        
+        # Output data
+        data = [poleSeparation, arcLength, areaCurve, maxCurve, avgCurve]
+        
+        return data, True
+        
+    except Exception as e:
+        print(f"Warning in manual measurements: {e}")
+        # Return basic measurements if detailed analysis fails
+        return [poleSeparation, arcLength, 0.0, 0.0, 0.0], True
+
+def spindlePlotManual(imageArr, threshArr, leftPole, rightPole):
+    """
+    Manual version of spindlePlot that uses manually specified pole positions
+    """
+    # Get the spindle array using automatic detection for the overall shape
+    spindleArray, doesSpindleExist = getSpindleImg(imageArr, threshArr)
+    
+    # If no spindle exists, still create a plot with manual poles on the image
+    if not doesSpindleExist:
+        spindleArray = imageArr  # Use the original image instead
+        doesSpindleExist = True  # Force to true since we have manual positions
+    
+    # Use manual pole positions instead of fitted ones
+    centerPoint = ((leftPole[0] + rightPole[0]) / 2, (leftPole[1] + rightPole[1]) / 2)
+    
+    return (spindleArray, leftPole, rightPole, centerPoint), doesSpindleExist
+
 # a class to represent threshold objects
 class thresholdObject():
 

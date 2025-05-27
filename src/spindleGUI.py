@@ -12,6 +12,7 @@ import threshFunctions as threshF
 import curveFitData as cFD
 import plotSpindle as pS
 import plotDialog as pD
+import manualSpindleDialog as mSD
 import os
 from numpy import zeros, arange
 import matplotlib.pyplot as plt
@@ -50,11 +51,16 @@ class MainWindow(QMainWindow):
         # keep track of whether the preview is the default or not
         self.isPreviewCleared = True
         
+        # Store manual override data
+        self.manual_override_active = False
+        self.manual_left_pole = None
+        self.manual_right_pole = None
+        
         # Enable keyboard focus for key events
         self.setFocusPolicy(Qt.StrongFocus)
         
         # Add a status bar to show keyboard shortcuts
-        self.statusBar().showMessage("Keyboard Controls: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iterations ±1 | A/D GOL Factor ±1 | Space Preview | E Export")
+        self.statusBar().showMessage("Keyboard Controls: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iterations ±1 | A/D GOL Factor ±1 | Space Preview | M Manual | E Export")
 
         # create accessible widgets
         self.importLabel = QLabel("Single Z")
@@ -90,9 +96,11 @@ class MainWindow(QMainWindow):
         self.gOLFactorValue.setMaximum(8)
         self.gOLFactorValue.setValue(4)
 
-        self.previewButton = QPushButton("Preview")
         self.addButton = QPushButton("Add")
         self.tossButton = QPushButton("Toss")
+        self.previewButton = QPushButton("Preview")
+        self.manualButton = QPushButton("Manual Override")
+        
         self.tossButton.setSizePolicy(QSizePolicy.Maximum,
                                            QSizePolicy.Maximum)
         self.exportButton = QPushButton("Export")
@@ -106,7 +114,7 @@ class MainWindow(QMainWindow):
         self.dataTableArray = None
         
         # Hotkeys information
-        self.hotkeysLabel = QLabel("Hotkeys: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iter ±1 | A/D GOL Factor ±1 | Space Preview | E Export")
+        self.hotkeysLabel = QLabel("Hotkeys: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iter ±1 | A/D GOL Factor ±1 | Space Preview | M Manual | E Export")
         self.hotkeysLabel.setWordWrap(True)
         self.hotkeysLabel.setStyleSheet("color: #777777; font-size: 9pt;")
 
@@ -208,10 +216,11 @@ class MainWindow(QMainWindow):
         tempVertical.addSpacing(defaultSize.height())
         tempVertical.addWidget(dataTitle)
         tempGrid.addWidget(self.addButton, 0, 0)
-        tempGrid.addWidget(self.previewButton, 0, 1)
-        tempGrid.addWidget(self.tossButton, 1, 0)
-        tempGrid.addWidget(self.exportButton, 1, 1)
-        tempGrid.addWidget(self.runAllFramesButton, 2, 0, 1, 2)
+        tempGrid.addWidget(self.tossButton, 0, 1)
+        tempGrid.addWidget(self.previewButton, 1, 0)
+        tempGrid.addWidget(self.manualButton, 1, 1)
+        tempGrid.addWidget(self.runAllFramesButton, 2, 0)
+        tempGrid.addWidget(self.exportButton, 2, 1)
         bottomLeftWidget.setLayout(tempGrid)
         tempVertical.addWidget(bottomLeftWidget)
         tempVertical.addWidget(self.hotkeysLabel)
@@ -260,10 +269,11 @@ class MainWindow(QMainWindow):
         # set fixed button sizes
         self.tiffButton.setFixedSize(defaultSize)
         self.previewButton.setFixedSize(defaultSize)
+        self.manualButton.setFixedSize(defaultSize)
         self.addButton.setFixedSize(defaultSize)
         self.tossButton.setFixedSize(defaultSize)
         self.exportButton.setFixedSize(defaultSize)
-        self.runAllFramesButton.setFixedWidth(defaultSize.width() * 2 + 6)  # Width of two buttons plus spacing
+        self.runAllFramesButton.setFixedSize(defaultSize)
 
         # connect signals to slots
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
@@ -274,6 +284,7 @@ class MainWindow(QMainWindow):
         self.gOLFactorValue.textChanged.connect(self.applyThreshold)
 
         self.previewButton.clicked.connect(self.onPreviewClicked)
+        self.manualButton.clicked.connect(self.onManualOverrideClicked)
         self.addButton.clicked.connect(self.onAddDataClicked)
         self.tossButton.clicked.connect(self.onTossDataClicked)
         self.exportButton.clicked.connect(self.onExportDataClicked)
@@ -354,9 +365,19 @@ class MainWindow(QMainWindow):
     # handle the preview button press
     def onPreviewClicked(self):
         if self.fileName:
-            spindlePlotData, doesSpindleExist = (
-                    cFD.spindlePlot(self.imagePixLabel.imageArr, 
-                                    self.threshPixLabel.imageArr))
+            if self.manual_override_active:
+                # Use manual pole positions to create preview
+                spindlePlotData, doesSpindleExist = cFD.spindlePlotManual(
+                    self.imagePixLabel.imageArr,
+                    self.threshPixLabel.imageArr,
+                    self.manual_left_pole,
+                    self.manual_right_pole
+                )
+            else:
+                # Use automatic detection
+                spindlePlotData, doesSpindleExist = (
+                        cFD.spindlePlot(self.imagePixLabel.imageArr, 
+                                        self.threshPixLabel.imageArr))
             
             # Draw on preview image
             previewPixmap = pS.plotSpindle(spindlePlotData, doesSpindleExist)
@@ -370,13 +391,52 @@ class MainWindow(QMainWindow):
             
             self.isPreviewCleared = False
     
+    # handle manual override button press
+    def onManualOverrideClicked(self):
+        if self.fileName and hasattr(self, 'imagePixLabel') and hasattr(self, 'threshPixLabel'):
+            if self.imagePixLabel.imageArr is not None and self.threshPixLabel.imageArr is not None:
+                # Create and show the manual override dialog
+                manual_dialog = mSD.ManualSpindleDialog(
+                    self, 
+                    self.imagePixLabel.imageArr, 
+                    self.threshPixLabel.imageArr
+                )
+                
+                # Connect the signal to handle manual position updates
+                manual_dialog.manual_positions_changed.connect(self.on_manual_positions_changed)
+                
+                # Show the dialog
+                manual_dialog.exec()
+    
+    def on_manual_positions_changed(self, left_pole, right_pole):
+        """Handle manual pole position updates from the dialog"""
+        self.manual_override_active = True
+        self.manual_left_pole = left_pole
+        self.manual_right_pole = right_pole
+        
+        # Update the preview with manual positions
+        self.onPreviewClicked()
+        
+        # Update the status bar to indicate manual override is active
+        self.statusBar().showMessage("Manual override active - pole positions manually set", 3000)
+    
     # handle the add data button press
     def onAddDataClicked(self):
 
         if self.fileName:
-            data, doesSpindleExist = (cFD.spindleMeasurements(
-                                            self.imagePixLabel.imageArr,
-                                            self.threshPixLabel.imageArr))
+            if self.manual_override_active:
+                # Use manual override measurements
+                data, doesSpindleExist = cFD.spindleMeasurementsManual(
+                    self.imagePixLabel.imageArr,
+                    self.threshPixLabel.imageArr,
+                    self.manual_left_pole,
+                    self.manual_right_pole
+                )
+            else:
+                # Use automatic detection
+                data, doesSpindleExist = (cFD.spindleMeasurements(
+                                                self.imagePixLabel.imageArr,
+                                                self.threshPixLabel.imageArr))
 
             if doesSpindleExist:
                 # add the row of data to the data table
@@ -451,6 +511,11 @@ class MainWindow(QMainWindow):
             self.threshPixLabel.setPixmap(tiffF.defaultPix(self.backShade))
             self.previewPixLabel.setPixmap(tiffF.defaultPix(self.backShade))
             self.isPreviewCleared = True
+            
+            # Clear manual override when threshold changes
+            self.manual_override_active = False
+            self.manual_left_pole = None
+            self.manual_right_pole = None
             
             # If we have an image loaded, ensure we're showing the original without overlays
             if hasattr(self, 'imagePixLabel') and hasattr(self.imagePixLabel, 'imageArr') and self.imagePixLabel.imageArr is not None:
@@ -534,6 +599,9 @@ class MainWindow(QMainWindow):
         elif event.key() == Qt.Key_Space:
             # Space - Preview (same as Preview button)
             self.onPreviewClicked()
+        elif event.key() == Qt.Key_M:
+            # M - Manual override
+            self.onManualOverrideClicked()
         elif event.key() == Qt.Key_E:
             # E - Export data
             self.onExportDataClicked()
