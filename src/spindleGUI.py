@@ -850,8 +850,12 @@ class ImageTableModel(QAbstractTableModel):
                 return str(section + 1)
 
 # create and display the application if this file is being run
-if __name__ == "__main__":
+def main():
+    """Main entry point for the application"""
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
+
+if __name__ == "__main__":
+    main()
