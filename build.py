@@ -99,10 +99,10 @@ def build_with_pyinstaller(python_executable):
     executable_path = Path("dist") / executable_name
     
     if executable_path.exists():
-        print(f"✓ PyInstaller build successful: {executable_path}")
+        print(f"[SUCCESS] PyInstaller build successful: {executable_path}")
         return executable_path
     else:
-        print("✗ PyInstaller build failed!")
+        print("[ERROR] PyInstaller build failed!")
         return None
 
 def create_launcher_scripts(executable_path):
@@ -144,7 +144,7 @@ cd "$SCRIPT_DIR"
         os.chmod(launcher_path, 0o755)
         os.chmod(executable_path, 0o755)
     
-    print(f"✓ Created launcher: {launcher_path}")
+    print(f"[SUCCESS] Created launcher: {launcher_path}")
     return launcher_path
 
 def create_distribution_package(executable_path, launcher_path):
@@ -174,7 +174,7 @@ def create_distribution_package(executable_path, launcher_path):
             tarf.add(executable_path, executable_path.name)
             tarf.add(launcher_path, launcher_path.name)
     
-    print(f"✓ Created package: {package_path}")
+    print(f"[SUCCESS] Created package: {package_path}")
     return package_path
 
 def create_appimage():
@@ -183,7 +183,7 @@ def create_appimage():
         return None
     
     if not shutil.which("appimagetool"):
-        print("⚠ appimagetool not found, skipping AppImage creation")
+        print("[WARNING] appimagetool not found, skipping AppImage creation")
         return None
     
     print("Creating AppImage...")
@@ -233,10 +233,10 @@ exec "${HERE}/usr/bin/mitotic-spindle-tool" "$@"
         appimage_path = Path("dist/mitotic-spindle-tool.AppImage")
         if appimage_path.exists():
             os.chmod(appimage_path, 0o755)
-            print(f"✓ Created AppImage: {appimage_path}")
+            print(f"[SUCCESS] Created AppImage: {appimage_path}")
             return appimage_path
     except Exception as e:
-        print(f"⚠ AppImage creation failed: {e}")
+        print(f"[WARNING] AppImage creation failed: {e}")
         os.chdir("..")
     
     return None

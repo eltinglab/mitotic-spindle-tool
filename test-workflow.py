@@ -39,10 +39,10 @@ def test_lint():
         
         # Run linting
         run_command([sys.executable, "-m", "flake8", "src/", "--count", "--select=E9,F63,F7,F82", "--show-source", "--statistics"])
-        print("✅ Linting passed")
+        print("[SUCCESS] Linting passed")
         return True
     except subprocess.CalledProcessError as e:
-        print(f"❌ Linting failed: {e}")
+        print(f"[ERROR] Linting failed: {e}")
         return False
 
 def test_imports():
@@ -59,12 +59,12 @@ def test_imports():
         
         for module in modules:
             try:
-                run_command([sys.executable, "-c", f"import {module}; print('✅ {module} imports successfully')"])
+                run_command([sys.executable, "-c", f"import {module}; print('[SUCCESS] {module} imports successfully')"])
             except subprocess.CalledProcessError:
-                print(f"❌ {module} import failed")
+                print(f"[ERROR] {module} import failed")
                 return False
                 
-        print("✅ All imports successful")
+        print("[SUCCESS] All imports successful")
         return True
     finally:
         os.chdir(original_cwd)
@@ -91,15 +91,15 @@ def test_build():
         if executable_path.exists():
             size = executable_path.stat().st_size
             size_mb = size / (1024 * 1024)
-            print(f"✅ Executable built successfully: {executable_path}")
+            print(f"[SUCCESS] Executable built successfully: {executable_path}")
             print(f"📁 Size: {size_mb:.2f} MB")
             return True
         else:
-            print(f"❌ Executable not found: {executable_path}")
+            print(f"[ERROR] Executable not found: {executable_path}")
             return False
             
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed: {e}")
+        print(f"[ERROR] Build failed: {e}")
         return False
 
 def test_package():
@@ -121,7 +121,7 @@ def test_package():
                 zipf.write("mitotic-spindle-tool.exe")
                 if os.path.exists("run-mitotic-spindle-tool.bat"):
                     zipf.write("run-mitotic-spindle-tool.bat")
-            print("✅ Windows ZIP package created")
+            print("[SUCCESS] Windows ZIP package created")
             
         else:
             # Test tar.gz creation
@@ -130,13 +130,13 @@ def test_package():
                 tarf.add("mitotic-spindle-tool")
                 if os.path.exists("run-mitotic-spindle-tool.sh"):
                     tarf.add("run-mitotic-spindle-tool.sh")
-            print("✅ Unix tar.gz package created")
+            print("[SUCCESS] Unix tar.gz package created")
             
         os.chdir("..")
         return True
         
     except Exception as e:
-        print(f"❌ Package creation failed: {e}")
+        print(f"[ERROR] Package creation failed: {e}")
         os.chdir("..")
         return False
 
@@ -201,7 +201,7 @@ def main():
     
     # Check if we're in the right directory
     if not Path("src/spindleGUI.py").exists():
-        print("❌ Error: Please run this script from the project root directory")
+        print("[ERROR] Error: Please run this script from the project root directory")
         sys.exit(1)
     
     # Install dependencies
@@ -233,7 +233,7 @@ def main():
     total = len(results)
     
     for test_name, result in results.items():
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "[PASS]" if result else "[FAIL]"
         print(f"{test_name:<15} {status}")
     
     print(f"\nOverall: {passed}/{total} tests passed")
@@ -242,7 +242,7 @@ def main():
         print("🎉 All tests passed! The workflow should work on GitHub Actions.")
         return 0
     else:
-        print("❌ Some tests failed. Fix issues before pushing to GitHub.")
+        print("[ERROR] Some tests failed. Fix issues before pushing to GitHub.")
         return 1
 
 if __name__ == "__main__":
