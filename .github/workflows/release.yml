@@ -123,10 +123,10 @@ jobs:
       shell: bash
       run: |
         if [[ -f "dist/${{ matrix.executable }}" ]]; then
-          echo "✓ Executable built successfully"
+          echo "[SUCCESS] Executable built successfully"
           ls -la dist/
         else
-          echo "✗ Executable not found"
+          echo "[ERROR] Executable not found"
           exit 1
         fi
         

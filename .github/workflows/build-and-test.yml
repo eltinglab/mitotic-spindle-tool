@@ -42,7 +42,7 @@ jobs:
         # Skip GUI imports in CI - just test that modules can be imported
         cd src
         echo "Skipping GUI imports in CI environment"
-        python -c "print('✓ Python syntax validation passed')"
+        python -c "print('Python syntax validation passed')"
         
     - name: Build executable
       run: |
@@ -53,18 +53,18 @@ jobs:
       run: |
         if [[ "${{ runner.os }}" == "Windows" ]]; then
           if [[ -f "dist/mitotic-spindle-tool.exe" ]]; then
-            echo "✓ Windows executable built successfully"
+            echo "[SUCCESS] Windows executable built successfully"
             ls -la dist/
           else
-            echo "✗ Windows executable not found"
+            echo "[ERROR] Windows executable not found"
             exit 1
           fi
         else
           if [[ -f "dist/mitotic-spindle-tool" ]]; then
-            echo "✓ Unix executable built successfully"
+            echo "[SUCCESS] Unix executable built successfully"
             ls -la dist/
           else
-            echo "✗ Unix executable not found"
+            echo "[ERROR] Unix executable not found"
             exit 1
           fi
         fi

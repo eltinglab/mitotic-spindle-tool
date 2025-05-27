@@ -77,7 +77,7 @@ jobs:
         # Skip GUI imports in CI - just test that modules can be imported
         cd src
         echo "Skipping GUI imports in CI environment"
-        python -c "print('✓ Python syntax validation passed')"
+        python -c "print('Python syntax validation passed')"
         
     - name: Build executable
       run: |
@@ -90,26 +90,30 @@ jobs:
         echo "" >> build_report.md
         
         if [[ -f "dist/${{ matrix.executable }}" ]]; then
-          echo "✅ **Executable built successfully**" >> build_report.md
+          echo "**[SUCCESS]** **Executable built successfully**" >> build_report.md
           
           # Get file size
           if [[ "${{ runner.os }}" == "Windows" ]]; then
             SIZE=$(powershell -command "(Get-Item 'dist/${{ matrix.executable }}').Length")
             SIZE_MB=$(powershell -command "[math]::Round((Get-Item 'dist/${{ matrix.executable }}').Length / 1MB, 2)")
-            echo "📁 **Size**: ${SIZE_MB} MB" >> build_report.md
+            echo "**Size**: ${SIZE_MB} MB" >> build_report.md
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            SIZE=$(stat -f %z "dist/${{ matrix.executable }}")
+            SIZE_MB=$(python3 -c "print(f'{$SIZE / 1024 / 1024:.2f}')")
+            echo "**Size**: ${SIZE_MB} MB" >> build_report.md
           else
             SIZE=$(stat -c%s "dist/${{ matrix.executable }}")
-            SIZE_MB=$(echo "scale=2; $SIZE / 1024 / 1024" | bc)
-            echo "📁 **Size**: ${SIZE_MB} MB" >> build_report.md
+            SIZE_MB=$(python3 -c "print(f'{$SIZE / 1024 / 1024:.2f}')")
+            echo "**Size**: ${SIZE_MB} MB" >> build_report.md
           fi
           
-          echo "📂 **Files created**:" >> build_report.md
+          echo "**Files created**:" >> build_report.md
           echo '```' >> build_report.md
           ls -la dist/ >> build_report.md
           echo '```' >> build_report.md
           
         else
-          echo "❌ **Build failed** - Executable not found" >> build_report.md
+          echo "**[ERROR]** **Build failed** - Executable not found" >> build_report.md
           exit 1
         fi
         
@@ -159,7 +163,7 @@ jobs:
           const path = require('path');
           
           // Collect all build reports
-          let comment = `## 🔨 Build Results for PR #${{ needs.pr-info.outputs.pr_number }}\n\n`;
+          let comment = `## Build Results for PR #${{ needs.pr-info.outputs.pr_number }}\n\n`;
           comment += `**PR Title**: ${{ needs.pr-info.outputs.pr_title }}\n\n`;
           
           const platforms = ['linux', 'windows', 'macos'];
@@ -172,19 +176,19 @@ jobs:
               const reportContent = fs.readFileSync(reportPath, 'utf8');
               comment += reportContent + '\n\n';
               
-              if (reportContent.includes('❌')) {
+              if (reportContent.includes('[ERROR]')) {
                 allBuildsSuccessful = false;
               }
             } else {
-              comment += `## Build Results for ${platform}\n❌ **Build failed** - No report generated\n\n`;
+              comment += `## Build Results for ${platform}\n**[ERROR]** **Build failed** - No report generated\n\n`;
               allBuildsSuccessful = false;
             }
           }
           
           if (allBuildsSuccessful) {
-            comment += `## ✅ Summary\nAll builds completed successfully! 🎉\n\n`;
+            comment += `## [SUCCESS] Summary\nAll builds completed successfully!\n\n`;
           } else {
-            comment += `## ❌ Summary\nSome builds failed. Please check the logs above.\n\n`;
+            comment += `## [ERROR] Summary\nSome builds failed. Please check the logs above.\n\n`;
           }
           
           comment += `### 📥 Download Artifacts\n`;
