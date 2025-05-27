@@ -1,0 +1,137 @@
+name: Version Management
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      version_number:
+        description: 'Specific version number (optional, overrides version_type)'
+        required: false
+        type: string
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install bump2version
+        
+    - name: Configure git
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+    - name: Get current version
+      id: current_version
+      run: |
+        # Extract version from setup.py
+        CURRENT_VERSION=$(grep -E "version\s*=\s*['\"]" setup.py | sed -E "s/.*version\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current version: $CURRENT_VERSION"
+        
+    - name: Determine new version
+      id: version
+      run: |
+        CURRENT_VERSION="${{ steps.current_version.outputs.current_version }}"
+        
+        if [[ -n "${{ github.event.inputs.version_number }}" ]]; then
+          NEW_VERSION="${{ github.event.inputs.version_number }}"
+          echo "Using specified version: $NEW_VERSION"
+        else
+          # Parse current version
+          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
+          MAJOR=${VERSION_PARTS[0]}
+          MINOR=${VERSION_PARTS[1]}
+          PATCH=${VERSION_PARTS[2]}
+          
+          case "${{ github.event.inputs.version_type }}" in
+            "major")
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            "minor")
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            "patch")
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "Bumping ${{ github.event.inputs.version_type }} version: $CURRENT_VERSION → $NEW_VERSION"
+        fi
+        
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Update version in files
+      run: |
+        NEW_VERSION="${{ steps.version.outputs.new_version }}"
+        
+        # Update setup.py
+        sed -i "s/version=\"[^\"]*\"/version=\"$NEW_VERSION\"/g" setup.py
+        
+        # Update pyproject.toml
+        sed -i "s/version = \"[^\"]*\"/version = \"$NEW_VERSION\"/g" pyproject.toml
+        
+        # Update version in spindleGUI.py
+        sed -i "s/versionNumber = \"v[^\"]*\"/versionNumber = \"v$NEW_VERSION\"/g" src/spindleGUI.py
+        
+    - name: Create version update commit
+      run: |
+        NEW_VERSION="${{ steps.version.outputs.new_version }}"
+        
+        git add setup.py pyproject.toml src/spindleGUI.py
+        git commit -m "Bump version to v$NEW_VERSION"
+        
+    - name: Create and push tag
+      run: |
+        NEW_VERSION="${{ steps.version.outputs.new_version }}"
+        
+        git tag -a "v$NEW_VERSION" -m "Release version $NEW_VERSION"
+        git push origin main
+        git push origin "v$NEW_VERSION"
+        
+    - name: Create GitHub Release
+      run: |
+        RELEASE_BODY="## Mitotic Spindle Tool v${{ steps.version.outputs.new_version }}
+        
+        This release was automatically created by the version management workflow.
+        
+        ### Downloads
+        Executables for all platforms will be available once the release build completes.
+        
+        ### Changes
+        See the commit history for detailed changes in this release."
+        
+        gh release create "v${{ steps.version.outputs.new_version }}" \
+          --title "Release v${{ steps.version.outputs.new_version }}" \
+          --notes "$RELEASE_BODY" \
+          --draft \
+          --prerelease=false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

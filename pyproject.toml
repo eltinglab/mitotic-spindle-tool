@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mitotic-spindle-tool"
+version = "1.0.2"
+authors = [
+    {name = "Kergan Sanderson"},
+    {name = "Joe Lannan"},
+]
+description = "An image analysis Python GUI application for mitotic spindle analysis"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Processing",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "PySide6",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "seaborn",
+]
+
+[project.urls]
+Homepage = "https://github.com/eltinglab/mitotic-spindle-tool"
+Repository = "https://github.com/eltinglab/mitotic-spindle-tool"
+Issues = "https://github.com/eltinglab/mitotic-spindle-tool/issues"
+
+[project.scripts]
+mitotic-spindle-tool = "spindleGUI:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = [
+    "spindleGUI",
+    "curveFitData", 
+    "plotSpindle",
+    "plotDialog",
+    "manualSpindleDialog",
+    "spindlePreviewDialog",
+    "threshFunctions",
+    "tiffFunctions"
+]
