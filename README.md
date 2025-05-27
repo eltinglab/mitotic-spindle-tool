@@ -7,7 +7,7 @@ Requirements: Python and git
 
 open terminal  
 
-clone this repo `git clone https://github.com/eltinglab/mitotic-spindle-tool'  
+clone this repo `git clone https://github.com/eltinglab/mitotic-spindle-tool`  
 
 cd into this repo `cd mitotic-spindle-tool` 
 
@@ -20,7 +20,7 @@ run `python src/spindleGUI.py"
 
 # New Features:
 
-hotkeys for faster data processing  
+Hotkeys for faster data processing  
 
 Click on a column to show a plot of the data  
 

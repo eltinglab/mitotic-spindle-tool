@@ -2,6 +2,8 @@ from PySide6.QtGui import QPainter, QPainterPath, QColorConstants, QPen
 from PySide6.QtCore import QPoint, QPointF
 import tiffFunctions as tiffF
 from numpy import zeros
+from scipy.ndimage import rotate as nd_rotate
+import numpy as np
 
 # used for plotting the results of the curve fit onto the preview pixmap
 def plotSpindle(fitResults, doesSpindleExist):
@@ -115,6 +117,50 @@ def plotSpindleOnOriginal(originalImageArr, fitResults, doesSpindleExist):
     painter.end()
     
     return originalPix
+
+def plotSpindleOnOriginalTransformed(originalImageArr, fitResults, doesSpindleExist, rotAngle, bbox):
+    """
+    Crop and rotate the original image to match the processed spindle image,
+    then draw the spindle overlay on it.
+    bbox: (minY, maxY, minX, maxX)
+    rotAngle: angle in degrees (same as used for thresholded image)
+    """
+    if not doesSpindleExist:
+        return tiffF.pixFromArr(originalImageArr)
+
+    minY, maxY, minX, maxX = bbox
+    # Crop the original image to the bounding box
+    cropped = originalImageArr[minY:maxY+1, minX:maxX+1]
+    # Rotate the cropped image by the same angle
+    rotated = nd_rotate(cropped, rotAngle, order=1)
+    # Convert to QPixmap
+    pix = tiffF.pixFromArr(rotated)
+    # Draw the spindle overlay (fitResults coordinates are in rotated/cropped frame)
+    leftPole = fitResults[1]
+    rightPole = fitResults[2]
+    centerPoint = fitResults[3]
+    sF = 2
+    if sF > 1:
+        leftPole = (leftPole[0] * sF, leftPole[1] * sF)
+        rightPole = (rightPole[0] * sF, rightPole[1] * sF)
+        centerPoint = (centerPoint[0] * sF, centerPoint[1] * sF)
+    controlPoint = calculateBezierPoint(leftPole, centerPoint, rightPole)
+    painter = QPainter()
+    painter.begin(pix)
+    painter.setOpacity(0.7)
+    path = QPainterPath(QPointF(leftPole[0], leftPole[1]))
+    path.quadTo(controlPoint[0], controlPoint[1], rightPole[0], rightPole[1])
+    pen = QPen(QColorConstants.Green)
+    pen.setWidth(2 * sF)
+    painter.setPen(pen)
+    painter.drawPath(path)
+    pointRadius = 3 * sF
+    painter.setPen(QColorConstants.Green)
+    painter.setBrush(QColorConstants.Green)
+    painter.drawEllipse(QPoint(int(leftPole[0]), int(leftPole[1])), pointRadius, pointRadius)
+    painter.drawEllipse(QPoint(int(rightPole[0]), int(rightPole[1])), pointRadius, pointRadius)
+    painter.end()
+    return pix
 
 def calculateBezierPoint(lP, cP, rP):
 

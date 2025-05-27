@@ -155,9 +155,15 @@ def getSpindleImg(imageArr, arr):
     
     # create array with only the spindle object
     spindleArr = zeros(threshArr.shape)
+    minY, maxY = float('inf'), -float('inf')
+    minX, maxX = float('inf'), -float('inf')
     for i in range(0, spindle.numPoints):
-        spindleArr[spindle.yCoords[i], spindle.xCoords[i]] = 1
-    
+        y, x = spindle.yCoords[i], spindle.xCoords[i]
+        spindleArr[y, x] = 1
+        if y < minY: minY = y
+        if y > maxY: maxY = y
+        if x < minX: minX = x
+        if x > maxX: maxX = x
     # multiply original image by the one we just made
     spindleImg = imageArr * spindleArr
 
@@ -182,11 +188,12 @@ def getSpindleImg(imageArr, arr):
 
     rotAngle = - arctan(mainvector[0]/mainvector[1]) * 180 / pi
     rotImg = rotate(spindleImg, rotAngle, order=1)
-    
-    return rotImg, doesSpindleExist
+    # Return bounding box and rotation angle for transformation
+    bbox = (int(minY), int(maxY), int(minX), int(maxX))
+    return rotImg, doesSpindleExist, rotAngle, bbox
 
 def spindleMeasurements(imageArr, threshArr):
-    spindleArray, doesSpindleExist = getSpindleImg(imageArr, threshArr)
+    spindleArray, doesSpindleExist, _, _ = getSpindleImg(imageArr, threshArr)
 
     # if spindle doesn't exist in the threshold, don't do calculations
     if not doesSpindleExist:
@@ -261,7 +268,7 @@ def spindleMeasurements(imageArr, threshArr):
     return data, doesSpindleExist
 
 def spindlePlot(imageArr, threshArr):
-    spindleArray, doesSpindleExist = getSpindleImg(imageArr, threshArr)
+    spindleArray, doesSpindleExist, _, _ = getSpindleImg(imageArr, threshArr)
 
     # FIT CURVE AND FIND POLES
     numPoints = int(npsum(spindleArray > 0.0))
