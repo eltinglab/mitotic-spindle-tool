@@ -295,7 +295,7 @@ class MainWindow(QMainWindow):
 
         fileName, filter = QFileDialog.getOpenFileName(
                 parent=self, caption='Open .tiff',
-                dir=QDir.homePath(), filter='*.tiff;*.tif')
+                dir=QDir.homePath())
         
         # if the user selected a file successfully
         if fileName:
