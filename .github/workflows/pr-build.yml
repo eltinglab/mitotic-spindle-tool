@@ -1,0 +1,209 @@
+name: PR Build Check
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  pr-info:
+    runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ github.event.number }}
+      pr_title: ${{ github.event.pull_request.title }}
+    steps:
+    - name: PR Info
+      run: |
+        echo "PR #${{ github.event.number }}: ${{ github.event.pull_request.title }}"
+
+  build-pr:
+    needs: pr-info
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            executable: mitotic-spindle-tool
+            python-version: '3.10'
+          - os: windows-latest
+            platform: windows
+            executable: mitotic-spindle-tool.exe
+            python-version: '3.10'
+          - os: macos-latest
+            platform: macos
+            executable: mitotic-spindle-tool
+            python-version: '3.10'
+            
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout PR code
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ github.event.pull_request.head.sha }}
+        
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install Linux dependencies (Ubuntu only)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget
+        # Install appimagetool for AppImage creation
+        wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool
+        sudo mv appimagetool /usr/local/bin/
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller flake8
+        
+    - name: Lint code
+      run: |
+        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        
+    - name: Test imports
+      run: |
+        cd src
+        python -c "import spindleGUI; print('✓ spindleGUI imports successfully')"
+        python -c "import curveFitData; print('✓ curveFitData imports successfully')"
+        python -c "import plotSpindle; print('✓ plotSpindle imports successfully')"
+        
+    - name: Build executable
+      run: |
+        python build.py
+        
+    - name: Verify build and collect info
+      shell: bash
+      run: |
+        echo "## Build Results for ${{ matrix.platform }}" >> build_report.md
+        echo "" >> build_report.md
+        
+        if [[ -f "dist/${{ matrix.executable }}" ]]; then
+          echo "✅ **Executable built successfully**" >> build_report.md
+          
+          # Get file size
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            SIZE=$(powershell -command "(Get-Item 'dist/${{ matrix.executable }}').Length")
+            SIZE_MB=$(powershell -command "[math]::Round((Get-Item 'dist/${{ matrix.executable }}').Length / 1MB, 2)")
+            echo "📁 **Size**: ${SIZE_MB} MB" >> build_report.md
+          else
+            SIZE=$(stat -c%s "dist/${{ matrix.executable }}")
+            SIZE_MB=$(echo "scale=2; $SIZE / 1024 / 1024" | bc)
+            echo "📁 **Size**: ${SIZE_MB} MB" >> build_report.md
+          fi
+          
+          echo "📂 **Files created**:" >> build_report.md
+          echo '```' >> build_report.md
+          ls -la dist/ >> build_report.md
+          echo '```' >> build_report.md
+          
+        else
+          echo "❌ **Build failed** - Executable not found" >> build_report.md
+          exit 1
+        fi
+        
+    - name: Create package for testing
+      shell: bash
+      run: |
+        cd dist
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          powershell -command "Compress-Archive -Path '${{ matrix.executable }}', 'run-mitotic-spindle-tool.bat' -DestinationPath 'mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.zip'"
+        else
+          tar -czf mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
+        fi
+        cd ..
+        
+    - name: Upload PR build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: pr-${{ needs.pr-info.outputs.pr_number }}-${{ matrix.platform }}-build
+        path: |
+          dist/mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.*
+          dist/mitotic-spindle-tool.AppImage
+          build_report.md
+        retention-days: 30
+        
+    - name: Upload build report
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-report-${{ matrix.platform }}
+        path: build_report.md
+        retention-days: 7
+
+  comment-pr:
+    needs: [pr-info, build-pr]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Download build reports
+      uses: actions/download-artifact@v3
+      with:
+        path: build-reports
+        
+    - name: Create PR comment
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Collect all build reports
+          let comment = `## 🔨 Build Results for PR #${{ needs.pr-info.outputs.pr_number }}\n\n`;
+          comment += `**PR Title**: ${{ needs.pr-info.outputs.pr_title }}\n\n`;
+          
+          const platforms = ['linux', 'windows', 'macos'];
+          let allBuildsSuccessful = true;
+          
+          for (const platform of platforms) {
+            const reportPath = path.join('build-reports', `build-report-${platform}`, 'build_report.md');
+            
+            if (fs.existsSync(reportPath)) {
+              const reportContent = fs.readFileSync(reportPath, 'utf8');
+              comment += reportContent + '\n\n';
+              
+              if (reportContent.includes('❌')) {
+                allBuildsSuccessful = false;
+              }
+            } else {
+              comment += `## Build Results for ${platform}\n❌ **Build failed** - No report generated\n\n`;
+              allBuildsSuccessful = false;
+            }
+          }
+          
+          if (allBuildsSuccessful) {
+            comment += `## ✅ Summary\nAll builds completed successfully! 🎉\n\n`;
+          } else {
+            comment += `## ❌ Summary\nSome builds failed. Please check the logs above.\n\n`;
+          }
+          
+          comment += `### 📥 Download Artifacts\n`;
+          comment += `Build artifacts are available for download from the "Artifacts" section of this workflow run.\n\n`;
+          comment += `**Available packages**:\n`;
+          comment += `- \`pr-${{ needs.pr-info.outputs.pr_number }}-linux-build\`\n`;
+          comment += `- \`pr-${{ needs.pr-info.outputs.pr_number }}-windows-build\`\n`;
+          comment += `- \`pr-${{ needs.pr-info.outputs.pr_number }}-macos-build\`\n\n`;
+          comment += `*Artifacts are retained for 30 days.*`;
+          
+          // Post the comment
+          await github.rest.issues.createComment({
+            issue_number: ${{ needs.pr-info.outputs.pr_number }},
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
