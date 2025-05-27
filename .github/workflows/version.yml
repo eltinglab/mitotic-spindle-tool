@@ -30,7 +30,7 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
         
@@ -117,21 +117,21 @@ jobs:
         git push origin "v$NEW_VERSION"
         
     - name: Create GitHub Release
-      uses: actions/create-release@v1
+      run: |
+        RELEASE_BODY="## Mitotic Spindle Tool v${{ steps.version.outputs.new_version }}
+        
+        This release was automatically created by the version management workflow.
+        
+        ### Downloads
+        Executables for all platforms will be available once the release build completes.
+        
+        ### Changes
+        See the commit history for detailed changes in this release."
+        
+        gh release create "v${{ steps.version.outputs.new_version }}" \
+          --title "Release v${{ steps.version.outputs.new_version }}" \
+          --notes "$RELEASE_BODY" \
+          --draft \
+          --prerelease=false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: v${{ steps.version.outputs.new_version }}
-        release_name: Release v${{ steps.version.outputs.new_version }}
-        body: |
-          ## Mitotic Spindle Tool v${{ steps.version.outputs.new_version }}
-          
-          This release was automatically created by the version management workflow.
-          
-          ### Downloads
-          Executables for all platforms will be available once the release build completes.
-          
-          ### Changes
-          See the commit history for detailed changes in this release.
-        draft: true
-        prerelease: false
