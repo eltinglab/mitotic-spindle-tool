@@ -1,17 +1,28 @@
 import sys
-from PySide6.QtWidgets import (QApplication, QMainWindow, QPushButton, QLabel,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QMainWindow, QPushButton, QLabel,
                                QSpinBox, QTableView, QWidget, QVBoxLayout,
                                QHBoxLayout, QGridLayout, QSizePolicy,
                                QFileDialog, QSplitter, QFrame, QSplitterHandle,
-                               QAbstractItemView)
+                               QAbstractItemView, QDialog)
 from PySide6.QtGui import (QPixmap, QFont, QPainter, QBrush, QGradient,
-                           QTransform)
+                           QTransform, QKeyEvent)
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel, QEvent
 import tiffFunctions as tiffF
 import threshFunctions as threshF
 import curveFitData as cFD
 import plotSpindle as pS
-from numpy import zeros
+import plotDialog as pD
+import os
+from numpy import zeros, arange
+import matplotlib.pyplot as plt
+import matplotlib
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+try:
+    import seaborn as sns
+    HAS_SEABORN = True
+except ImportError:
+    HAS_SEABORN = False
 
 # subclass QMainWindow to create a custom MainWindow
 class MainWindow(QMainWindow):
@@ -25,7 +36,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Mitotic Spindle Image Analysis")
         
         # Update the version for new releases
-        versionNumber = "v1.0.1"
+        versionNumber = "v1.0.2"
         
         # keep track of the open file name
         self.fileName = None
@@ -38,6 +49,12 @@ class MainWindow(QMainWindow):
         
         # keep track of whether the preview is the default or not
         self.isPreviewCleared = True
+        
+        # Enable keyboard focus for key events
+        self.setFocusPolicy(Qt.StrongFocus)
+        
+        # Add a status bar to show keyboard shortcuts
+        self.statusBar().showMessage("Keyboard Controls: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iterations ±1 | A/D GOL Factor ±1 | Space Preview | E Export")
 
         # create accessible widgets
         self.importLabel = QLabel("Single Z")
@@ -79,10 +96,19 @@ class MainWindow(QMainWindow):
         self.tossButton.setSizePolicy(QSizePolicy.Maximum,
                                            QSizePolicy.Maximum)
         self.exportButton = QPushButton("Export")
+        self.runAllFramesButton = QPushButton("Run All Frames")
 
         self.dataTableView = QTableView()
-        self.dataTableView.setSelectionMode(QAbstractItemView.NoSelection)
+        self.dataTableView.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.dataTableView.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.dataTableView.clicked.connect(self.onDataTableClicked)
+        self.dataTableView.horizontalHeader().sectionClicked.connect(self.onColumnHeaderClicked)
         self.dataTableArray = None
+        
+        # Hotkeys information
+        self.hotkeysLabel = QLabel("Hotkeys: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iter ±1 | A/D GOL Factor ±1 | Space Preview | E Export")
+        self.hotkeysLabel.setWordWrap(True)
+        self.hotkeysLabel.setStyleSheet("color: #777777; font-size: 9pt;")
 
         self.backShade = self.dataTableView.palette().base().color().value()
 
@@ -185,8 +211,10 @@ class MainWindow(QMainWindow):
         tempGrid.addWidget(self.previewButton, 0, 1)
         tempGrid.addWidget(self.tossButton, 1, 0)
         tempGrid.addWidget(self.exportButton, 1, 1)
+        tempGrid.addWidget(self.runAllFramesButton, 2, 0, 1, 2)
         bottomLeftWidget.setLayout(tempGrid)
         tempVertical.addWidget(bottomLeftWidget)
+        tempVertical.addWidget(self.hotkeysLabel)
         tempVertical.addStretch()
         tempVertical.addWidget(versionLabel)
         tempGrid = QGridLayout()
@@ -235,7 +263,8 @@ class MainWindow(QMainWindow):
         self.addButton.setFixedSize(defaultSize)
         self.tossButton.setFixedSize(defaultSize)
         self.exportButton.setFixedSize(defaultSize)
-        
+        self.runAllFramesButton.setFixedWidth(defaultSize.width() * 2 + 6)  # Width of two buttons plus spacing
+
         # connect signals to slots
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
 
@@ -248,6 +277,7 @@ class MainWindow(QMainWindow):
         self.addButton.clicked.connect(self.onAddDataClicked)
         self.tossButton.clicked.connect(self.onTossDataClicked)
         self.exportButton.clicked.connect(self.onExportDataClicked)
+        self.runAllFramesButton.clicked.connect(self.onRunAllFramesClicked)
 
         # center window on the desktop
         def centerApplication(xSize, ySize):
@@ -297,11 +327,16 @@ class MainWindow(QMainWindow):
     def onFrameUpdate(self):
         self.clearThreshAndPreview()
 
-        self.imagePixLabel.setPixmap(
-                tiffF.pixFromTiff(self.fileName, self.frameValue.value() - 1))
-        self.imagePixLabel.setImageArr(
-                tiffF.arrFromTiff(self.fileName, self.frameValue.value() - 1))
+        # Store the original image array for use in both display and overlay
+        imageArr = tiffF.arrFromTiff(self.fileName, self.frameValue.value() - 1)
+        self.imagePixLabel.setPixmap(tiffF.pixFromArr(imageArr))
+        self.imagePixLabel.setImageArr(imageArr)
+        
+        # Automatically apply threshold to show the thresholded image
         self.applyThreshold(cleared=True)
+        
+        # Automatically generate preview for immediate feedback
+        self.onPreviewClicked()
 
     # handle applying the threshold
     def applyThreshold(self, text="", cleared=False):
@@ -322,8 +357,17 @@ class MainWindow(QMainWindow):
             spindlePlotData, doesSpindleExist = (
                     cFD.spindlePlot(self.imagePixLabel.imageArr, 
                                     self.threshPixLabel.imageArr))
-            self.previewPixLabel.setPixmap(pS.plotSpindle(spindlePlotData,
-                                                          doesSpindleExist))
+            
+            # Draw on preview image
+            previewPixmap = pS.plotSpindle(spindlePlotData, doesSpindleExist)
+            self.previewPixLabel.setPixmap(previewPixmap)
+            
+            # Also draw same data on original image for comparison
+            originalWithOverlay = pS.plotSpindleOnOriginal(self.imagePixLabel.imageArr, 
+                                                          spindlePlotData, 
+                                                          doesSpindleExist)
+            self.imagePixLabel.setPixmap(originalWithOverlay, False)
+            
             self.isPreviewCleared = False
     
     # handle the add data button press
@@ -345,8 +389,13 @@ class MainWindow(QMainWindow):
 
                 indexOfData = self.dataTableModel.createIndex(frameIndex, 0)
                 self.dataTableView.scrollTo(indexOfData)
-
-                self.frameValue.setValue(frameIndex + 2)
+                
+                # Calculate next frame, but don't exceed total frames
+                nextFrame = min(frameIndex + 2, int(self.totalFrameValue.text()))
+                self.frameValue.setValue(nextFrame)
+                
+                # Automatically generate preview for the next image
+                self.onPreviewClicked()
     
     # handle the toss data button press
     def onTossDataClicked(self):
@@ -355,18 +404,22 @@ class MainWindow(QMainWindow):
             self.tossedFrames.append(tossedFrame)
             self.tossedFrames.sort()
             self.dataTableModel.addTossedRow(tossedFrame)
-            self.onAddDataClicked() # this follows previous lab standard
         elif (tossedFrame in self.tossedFrames and self.fileName):
             # "un-tosses" the frame
             self.tossedFrames.remove(tossedFrame)
             self.dataTableModel.removeTossedRow(tossedFrame)
-            self.onAddDataClicked()
 
         if self.fileName:
-            self.frameValue.setValue(tossedFrame + 1)
-
+            # Update the data table view
             indexOfData = self.dataTableModel.createIndex(tossedFrame - 1, 0)
             self.dataTableView.scrollTo(indexOfData)
+            
+            # Calculate next frame, but don't exceed total frames
+            nextFrame = min(tossedFrame + 1, int(self.totalFrameValue.text()))
+            self.frameValue.setValue(nextFrame)
+            
+            # Automatically generate preview for the next image
+            self.onPreviewClicked()
     
     # write the data to a textfile
     def onExportDataClicked(self):
@@ -394,9 +447,14 @@ class MainWindow(QMainWindow):
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
         if self.fileName:
+            # Reset threshold and preview images to default
             self.threshPixLabel.setPixmap(tiffF.defaultPix(self.backShade))
             self.previewPixLabel.setPixmap(tiffF.defaultPix(self.backShade))
             self.isPreviewCleared = True
+            
+            # If we have an image loaded, ensure we're showing the original without overlays
+            if hasattr(self, 'imagePixLabel') and hasattr(self.imagePixLabel, 'imageArr') and self.imagePixLabel.imageArr is not None:
+                self.imagePixLabel.setPixmap(tiffF.pixFromArr(self.imagePixLabel.imageArr))
 
     # changes default pixmap color when computer switches color mode
     def changeDefaultPixmaps(self):
@@ -426,6 +484,143 @@ class MainWindow(QMainWindow):
                 self.changeDefaultPixmaps()
         super().changeEvent(event)
         
+    # handle key events for frame navigation and data addition
+    def keyPressEvent(self, event: QKeyEvent):
+        if not self.fileName:
+            super().keyPressEvent(event)
+            return
+
+        # Handle key mappings
+        if event.key() == Qt.Key_Right:
+            # Right arrow - Add data (same as Add button)
+            self.onAddDataClicked()
+        elif event.key() == Qt.Key_Left:
+            # Left arrow - Toss/untoss data (same as Toss button)
+            self.onTossDataClicked()
+        elif event.key() == Qt.Key_Up:
+            # Up arrow - Increase threshold by 10
+            self.threshValue.setValue(self.threshValue.value() + 10)
+            self.applyThreshold()
+            self.onPreviewClicked()
+        elif event.key() == Qt.Key_Down:
+            # Down arrow - Decrease threshold by 10
+            self.threshValue.setValue(self.threshValue.value() - 10)
+            self.applyThreshold()
+            self.onPreviewClicked()
+        elif event.key() == Qt.Key_W:
+            # W - Increase GOL iterations by 1
+            newValue = min(self.gOLIterationsValue.value() + 1, self.gOLIterationsValue.maximum())
+            self.gOLIterationsValue.setValue(newValue)
+            self.applyThreshold()
+            self.onPreviewClicked()
+        elif event.key() == Qt.Key_S:
+            # S - Decrease GOL iterations by 1
+            newValue = max(self.gOLIterationsValue.value() - 1, self.gOLIterationsValue.minimum())
+            self.gOLIterationsValue.setValue(newValue)
+            self.applyThreshold()
+            self.onPreviewClicked()
+        elif event.key() == Qt.Key_D:
+            # D - Increase GOL factor by 1
+            newValue = min(self.gOLFactorValue.value() + 1, self.gOLFactorValue.maximum())
+            self.gOLFactorValue.setValue(newValue)
+            self.applyThreshold()
+            self.onPreviewClicked()
+        elif event.key() == Qt.Key_A:
+            # A - Decrease GOL factor by 1
+            newValue = max(self.gOLFactorValue.value() - 1, self.gOLFactorValue.minimum())
+            self.gOLFactorValue.setValue(newValue)
+            self.applyThreshold()
+            self.onPreviewClicked()
+        elif event.key() == Qt.Key_Space:
+            # Space - Preview (same as Preview button)
+            self.onPreviewClicked()
+        elif event.key() == Qt.Key_E:
+            # E - Export data
+            self.onExportDataClicked()
+            
+        super().keyPressEvent(event)
+
+    # process all frames automatically
+    def onRunAllFramesClicked(self):
+        if self.fileName:
+            totalFrames = int(self.totalFrameValue.text())
+            currentFrame = self.frameValue.value()
+            
+            # Start from the current frame
+            for frame in range(currentFrame, totalFrames + 1):
+                self.frameValue.setValue(frame)
+                
+                # Apply threshold and preview for this frame
+                self.applyThreshold()
+                self.onPreviewClicked()
+                
+                # Process the data
+                data, doesSpindleExist = (cFD.spindleMeasurements(
+                                            self.imagePixLabel.imageArr,
+                                            self.threshPixLabel.imageArr))
+
+                if doesSpindleExist:
+                    # add the row of data to the data table
+                    self.dataTableModel.beginResetModel()
+                    frameIndex = frame - 1
+                    for i in range(len(data)):
+                        self.dataTableArray[frameIndex, i] = data[i]
+                    self.dataTableModel.endResetModel()
+                else:
+                    # If no spindle exists, mark as tossed
+                    if frame not in self.tossedFrames:
+                        self.tossedFrames.append(frame)
+                        self.tossedFrames.sort()
+                        self.dataTableModel.addTossedRow(frame)
+            
+            # Show a status message when completed
+            self.statusBar().showMessage(f"Processed all frames from {currentFrame} to {totalFrames}", 5000)
+            
+    # Handle clicks on data table
+    def onDataTableClicked(self, index):
+        if index.column() == 0:  # If the leftmost column (index) was clicked
+            # Navigate to that frame
+            frame = index.row() + 1  # Convert from 0-based to 1-based index
+            self.frameValue.setValue(frame)
+            
+    # Handle clicks on column headers in the data table
+    def onColumnHeaderClicked(self, column_index):
+        if self.fileName and column_index >= 0:  # Allow all columns including index
+            # Get column name
+            if column_index < len(cFD.DATA_NAMES):
+                column_name = cFD.DATA_NAMES[column_index]
+                
+                # Debug print
+                print(f"Column clicked: {column_index}, Name: {column_name}")
+                
+                # Create arrays of frame numbers and data for the selected column
+                valid_frames = []
+                valid_data = []
+                
+                # Debug print to check data array dimensions
+                print(f"Data array shape: {self.dataTableArray.shape}")
+                
+                for i in range(self.dataTableArray.shape[0]):
+                    if i < len(self.dataTableArray) and column_index < self.dataTableArray.shape[1]:
+                        # Only include frames with valid data (non-zero values)
+                        value = self.dataTableArray[i, column_index]
+                        if value != 0:
+                            valid_frames.append(i + 1)  # 1-indexed frame numbers
+                            valid_data.append(value)
+                
+                # Debug print to check collected data
+                print(f"Valid frames found: {len(valid_frames)}")
+                
+                # Extract just the filename for display purposes
+                image_name_only = os.path.basename(self.fileName) if self.fileName else None
+                
+                # Create and show plot dialog even if no data (will show message)
+                plot_dialog = pD.PlotDialog(self, 
+                                          title=f"{column_name} vs Frame Number", 
+                                          image_name=self.fileName)
+                plot_dialog.plot_column_data(valid_frames, valid_data, column_name)
+                plot_dialog.exec()
+
 # QLabel for keeping the contained pixmap scaled correctly
 class PixLabel(QLabel):
 
@@ -554,4 +749,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    app.exec()
+    sys.exit(app.exec())

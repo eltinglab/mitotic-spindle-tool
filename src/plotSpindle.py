@@ -65,6 +65,57 @@ def plotSpindle(fitResults, doesSpindleExist):
 
     return spindlePix
 
+# draw the same overlay data onto the original image
+def plotSpindleOnOriginal(originalImageArr, fitResults, doesSpindleExist):
+    # Get the original image as a pixmap
+    originalPix = tiffF.pixFromArr(originalImageArr)
+    
+    # If there's no spindle data to draw, return the original image
+    if not doesSpindleExist:
+        return originalPix
+    
+    # Extract spindle data points
+    leftPole = fitResults[1]
+    rightPole = fitResults[2]
+    centerPoint = fitResults[3]
+    
+    # Scale up the pixmap for smoother overlaid drawings
+    sF = 2
+    
+    # Scale up coordinate values if needed
+    if sF > 1:
+        leftPole = (leftPole[0] * sF, leftPole[1] * sF)
+        rightPole = (rightPole[0] * sF, rightPole[1] * sF)
+        centerPoint = (centerPoint[0] * sF, centerPoint[1] * sF)
+    
+    # Calculate the control point for the Bezier curve
+    controlPoint = calculateBezierPoint(leftPole, centerPoint, rightPole)
+    
+    # Draw the fit line on the original image
+    painter = QPainter()
+    painter.begin(originalPix)
+    painter.setOpacity(0.7)  # Make slightly more visible on original image
+    
+    # Draw the Bezier curve
+    path = QPainterPath(QPointF(leftPole[0], leftPole[1]))
+    path.quadTo(controlPoint[0], controlPoint[1], rightPole[0], rightPole[1])
+    pen = QPen(QColorConstants.Yellow)  # Use yellow for better visibility on original
+    pen.setWidth(2 * sF)
+    painter.setPen(pen)
+    painter.drawPath(path)
+    
+    # Draw the poles
+    pointRadius = 3 * sF
+    painter.setPen(QColorConstants.Yellow)
+    painter.setBrush(QColorConstants.Yellow)
+    painter.drawEllipse(QPoint(int(leftPole[0]), int(leftPole[1])),
+                    pointRadius, pointRadius)
+    painter.drawEllipse(QPoint(int(rightPole[0]), int(rightPole[1])),
+                    pointRadius, pointRadius)
+    painter.end()
+    
+    return originalPix
+
 def calculateBezierPoint(lP, cP, rP):
 
     # Math for a 3 point Bezier Curve
