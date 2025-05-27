@@ -97,7 +97,6 @@ class MainWindow(QMainWindow):
                                            QSizePolicy.Maximum)
         self.exportButton = QPushButton("Export")
         self.runAllFramesButton = QPushButton("Run All Frames")
-        self.showSpindleOnSourceButton = QPushButton("Show Spindle on Source")
 
         self.dataTableView = QTableView()
         self.dataTableView.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -213,7 +212,6 @@ class MainWindow(QMainWindow):
         tempGrid.addWidget(self.tossButton, 1, 0)
         tempGrid.addWidget(self.exportButton, 1, 1)
         tempGrid.addWidget(self.runAllFramesButton, 2, 0, 1, 2)
-        tempGrid.addWidget(self.showSpindleOnSourceButton, 3, 0, 1, 2)
         bottomLeftWidget.setLayout(tempGrid)
         tempVertical.addWidget(bottomLeftWidget)
         tempVertical.addWidget(self.hotkeysLabel)
@@ -280,7 +278,6 @@ class MainWindow(QMainWindow):
         self.tossButton.clicked.connect(self.onTossDataClicked)
         self.exportButton.clicked.connect(self.onExportDataClicked)
         self.runAllFramesButton.clicked.connect(self.onRunAllFramesClicked)
-        self.showSpindleOnSourceButton.clicked.connect(self.onShowSpindleOnSourceClicked)
 
         # center window on the desktop
         def centerApplication(xSize, ySize):
