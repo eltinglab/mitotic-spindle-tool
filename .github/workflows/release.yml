@@ -1,6 +1,6 @@
 name: Release Build
 
-"on":
+on:
   push:
     tags:
       - 'v*'
@@ -116,6 +116,8 @@ jobs:
         pip install pyinstaller
         
     - name: Build executable
+      env:
+        CI: true
       run: |
         python build.py
         

@@ -37,6 +37,9 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller pytest
         
+    - name: Set CI environment variable
+      run: echo "CI=true" >> $GITHUB_ENV
+        
     - name: Test imports
       run: |
         # Skip GUI imports in CI - just test that modules can be imported
@@ -45,6 +48,8 @@ jobs:
         python -c "print('Python syntax validation passed')"
         
     - name: Build executable
+      env:
+        CI: true
       run: |
         python build.py
         

@@ -80,6 +80,8 @@ jobs:
         python -c "print('Python syntax validation passed')"
         
     - name: Build executable
+      env:
+        CI: true
       run: |
         python build.py
         

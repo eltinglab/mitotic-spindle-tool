@@ -30,10 +30,20 @@ def setup_virtual_environment():
     """Set up and activate virtual environment"""
     print("Setting up virtual environment...")
     
+    # Check if we're in CI environment - skip venv and use system Python
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        print("CI environment detected, using system Python...")
+        return "pip", sys.executable
+    
     venv_path = Path("venv")
     if not venv_path.exists():
         print("Creating virtual environment...")
-        run_command([sys.executable, "-m", "venv", "venv"])
+        try:
+            run_command([sys.executable, "-m", "venv", "venv"])
+        except subprocess.CalledProcessError as e:
+            print(f"[WARNING] Virtual environment creation failed: {e}")
+            print("Falling back to system Python...")
+            return "pip", sys.executable
     
     # Determine activation script path
     system = platform.system().lower()
@@ -46,20 +56,35 @@ def setup_virtual_environment():
         pip_executable = venv_path / "bin" / "pip"
         python_executable = venv_path / "bin" / "python"
     
+    # Verify that the executables exist
+    if not pip_executable.exists() or not python_executable.exists():
+        print("[WARNING] Virtual environment executables not found, using system Python...")
+        return "pip", sys.executable
+    
     return str(pip_executable), str(python_executable)
 
 def install_dependencies(pip_executable):
     """Install project dependencies"""
     print("Installing dependencies...")
     
-    # Upgrade pip
-    run_command([pip_executable, "install", "--upgrade", "pip"])
-    
-    # Install project dependencies
-    run_command([pip_executable, "install", "-r", "requirements.txt"])
-    
-    # Install build tools
-    run_command([pip_executable, "install", "pyinstaller", "setuptools", "wheel"])
+    try:
+        # Upgrade pip
+        run_command([pip_executable, "install", "--upgrade", "pip"])
+        
+        # Install project dependencies
+        run_command([pip_executable, "install", "-r", "requirements.txt"])
+        
+        # Install build tools
+        run_command([pip_executable, "install", "pyinstaller", "setuptools", "wheel"])
+        
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] Dependency installation failed: {e}")
+        # Try with system pip if the virtual env pip fails
+        if pip_executable != "pip":
+            print("Trying with system pip...")
+            run_command(["pip", "install", "--upgrade", "pip"])
+            run_command(["pip", "install", "-r", "requirements.txt"])
+            run_command(["pip", "install", "pyinstaller", "setuptools", "wheel"])
 
 def clean_build_artifacts():
     """Clean previous build artifacts"""
@@ -84,11 +109,19 @@ def build_with_pyinstaller(python_executable):
     """Build executable with PyInstaller"""
     print("Building executable with PyInstaller...")
     
-    # Run PyInstaller
-    result = run_command([
-        python_executable, "-m", "PyInstaller",
-        "mitotic-spindle-tool.spec"
-    ])
+    # Use system python if we couldn't set up venv properly
+    if python_executable == sys.executable:
+        cmd = [sys.executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"]
+    else:
+        cmd = [python_executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"]
+    
+    try:
+        # Run PyInstaller
+        result = run_command(cmd)
+    except subprocess.CalledProcessError as e:
+        print(f"[ERROR] PyInstaller failed with virtual env python: {e}")
+        print("Trying with system python...")
+        result = run_command([sys.executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"])
     
     system = platform.system().lower()
     if system == "windows":
