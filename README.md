@@ -14,7 +14,7 @@ clone this repo `git clone https://github.com/eltinglab/mitotic-spindle-tool`
 
 cd into this repo `cd mitotic-spindle-tool`
 
-create a python envirnoment using your favorite way to do that. ([Micromamba](https://micromamba.readthedocs.io/en/latest/)) recomended.
+create a python envirnoment using your favorite way to do that. [Micromamba](https://micromamba.readthedocs.io/en/latest/) recomended.
 
 with the activated environment, install the requirements with `pip install -r requirements.txt`
 
