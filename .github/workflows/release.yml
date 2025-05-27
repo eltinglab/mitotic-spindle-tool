@@ -103,19 +103,7 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
-          wget \
-          libegl1-mesa \
-          libgl1-mesa-glx \
-          libxkbcommon-x11-0 \
-          libxcb-icccm4 \
-          libxcb-image0 \
-          libxcb-keysyms1 \
-          libxcb-randr0 \
-          libxcb-render-util0 \
-          libxcb-xinerama0 \
-          libxcb-xfixes0 \
-          xvfb
+        sudo apt-get install -y wget
         # Install appimagetool for AppImage creation
         wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x appimagetool
@@ -129,12 +117,7 @@ jobs:
         
     - name: Build executable
       run: |
-        if [[ "${{ matrix.platform }}" == "linux" ]]; then
-          # Use virtual display for GUI components during build on Linux
-          xvfb-run -a python build.py
-        else
-          python build.py
-        fi
+        python build.py
         
     - name: Verify build
       shell: bash
