@@ -96,15 +96,7 @@ jobs:
         pr_author="${{ github.event.pull_request.user.login }}"
         
         # Create comprehensive release message
-        release_message="Release $new_version
-
-## Changes
-- $pr_title (PR #$pr_number by @$pr_author)
-
-## Commit
-${{ github.event.pull_request.merge_commit_sha }}
-
-This release was automatically created when PR #$pr_number was merged."
+        release_message="Release $new_version - $pr_title (PR #$pr_number by @$pr_author) - Commit: ${{ github.event.pull_request.merge_commit_sha }}"
         
         git tag -a "$new_version" -m "$release_message"
         git push origin "$new_version"
