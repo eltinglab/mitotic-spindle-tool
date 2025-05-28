@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mitotic-spindle-tool"
-version = "1.0.2"
+version = "1.0.6"
 authors = [
     {name = "Kergan Sanderson"},
     {name = "Joe Lannan"},

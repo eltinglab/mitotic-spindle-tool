@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env pytsetup(
+    name="mitotic-spindle-tool",
+    version="1.0.7",3
 """
 Setup script for Mitotic Spindle Tool
 """
