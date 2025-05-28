@@ -62,9 +62,14 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y wget
         # Install appimagetool for AppImage creation
+        echo "📥 Downloading appimagetool..."
         wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x appimagetool
         sudo mv appimagetool /usr/local/bin/
+        echo "✅ appimagetool installed"
+        echo "🔍 Verifying appimagetool installation:"
+        which appimagetool
+        appimagetool --version || echo "Note: appimagetool --version may not work but tool should be functional"
         
     - name: Install dependencies
       run: |
@@ -109,6 +114,35 @@ jobs:
             echo "**Size**: ${SIZE_MB} MB" >> build_report.md
           fi
           
+          # Check for AppImage on Linux
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            echo "" >> build_report.md
+            if [[ -f "dist/mitotic-spindle-tool.AppImage" ]]; then
+              echo "**[SUCCESS]** **AppImage created successfully** 📦" >> build_report.md
+              APPIMAGE_SIZE=$(stat -c%s "dist/mitotic-spindle-tool.AppImage")
+              APPIMAGE_SIZE_MB=$(python3 -c "print(f'{$APPIMAGE_SIZE / 1024 / 1024:.2f}')")
+              echo "**AppImage Size**: ${APPIMAGE_SIZE_MB} MB" >> build_report.md
+              
+              # Verify AppImage is executable
+              if [[ -x "dist/mitotic-spindle-tool.AppImage" ]]; then
+                echo "**AppImage Status**: ✅ Executable and ready for distribution" >> build_report.md
+              else
+                echo "**AppImage Status**: ⚠️ Created but not executable" >> build_report.md
+              fi
+            else
+              echo "**[WARNING]** **AppImage not found** ⚠️" >> build_report.md
+              echo "AppImage creation may have failed. Check build logs for details." >> build_report.md
+              
+              # Check if appimagetool was available
+              if command -v appimagetool >/dev/null 2>&1; then
+                echo "**appimagetool**: ✅ Available" >> build_report.md
+              else
+                echo "**appimagetool**: ❌ Not found - this explains the missing AppImage" >> build_report.md
+              fi
+            fi
+          fi
+          
+          echo "" >> build_report.md
           echo "**Files created**:" >> build_report.md
           echo '```' >> build_report.md
           ls -la dist/ >> build_report.md
