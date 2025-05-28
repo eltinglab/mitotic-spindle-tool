@@ -31,7 +31,7 @@ with the activated environment, install the requirements with `pip install -r re
 run `python src/spindleGUI.py`
 
 
-# New Features:
+# New Features
 
 Hotkeys for faster data processing
 
