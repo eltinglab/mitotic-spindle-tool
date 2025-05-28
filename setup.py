@@ -18,7 +18,7 @@ def read_requirements():
 
 setup(
     name="mitotic-spindle-tool",
-    version="1.0.2",
+    version="1.1.0",
     author="Kergan Sanderson, Joe Lannan",
     author_email="",
     description="An image analysis Python GUI application for mitotic spindle analysis",
