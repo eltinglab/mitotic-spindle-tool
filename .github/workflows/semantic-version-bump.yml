@@ -1,8 +1,12 @@
-name: Semantic Version Bump
+name: Semantic Version Bump (DISABLED - Conflicts with auto-version-bump.yml)
 
+# DISABLED: This workflow conflicts with auto-version-bump.yml
+# Both workflows can trigger version bumps, causing cascading effects
+# The auto-version-bump.yml (PR title-based) is preferred for explicit control
 on:
-  push:
-    branches: [main]
+  # push:
+  #   branches: [main]
+  workflow_dispatch:  # Can still be run manually if needed
 
 jobs:
   semantic-bump:

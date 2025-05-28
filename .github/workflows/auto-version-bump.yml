@@ -27,7 +27,21 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
     
+    - name: Check if this is already a version bump commit
+      id: version_bump_check
+      run: |
+        LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
+        if [[ "$LAST_COMMIT_MSG" =~ "Auto-bump version"|"Bump version" ]]; then
+          echo "skip_bump=true" >> $GITHUB_OUTPUT
+          echo "⚠️  Skipping version bump - this appears to be a version bump commit already"
+          echo "Last commit: $LAST_COMMIT_MSG"
+        else
+          echo "skip_bump=false" >> $GITHUB_OUTPUT
+          echo "✅ Proceeding with version bump analysis"
+        fi
+
     - name: Determine version bump type from PR title
+      if: steps.version_bump_check.outputs.skip_bump == 'false'
       id: bump_type
       run: |
         PR_TITLE="${{ github.event.pull_request.title }}"
@@ -45,6 +59,7 @@ jobs:
         fi
     
     - name: Auto-bump version
+      if: steps.version_bump_check.outputs.skip_bump == 'false'
       run: |
         BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
         
