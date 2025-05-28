@@ -11,6 +11,10 @@ import subprocess
 import shutil
 from pathlib import Path
 
+# Add src to path to import version
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+from version import __version__, VERSION_DISPLAY
+
 def run_command(cmd, check=True):
     """Run a command and return the result"""
     print(f"Running: {cmd}")
@@ -286,9 +290,52 @@ def create_appimage():
     (appdir / "usr/bin").mkdir(parents=True, exist_ok=True)
     (appdir / "usr/share/applications").mkdir(parents=True, exist_ok=True)
     (appdir / "usr/share/icons/hicolor/256x256/apps").mkdir(parents=True, exist_ok=True)
+    (appdir / "usr/share/icons/hicolor/512x512/apps").mkdir(parents=True, exist_ok=True)
+    (appdir / "usr/share/icons/hicolor/128x128/apps").mkdir(parents=True, exist_ok=True)
+    (appdir / "usr/share/icons/hicolor/64x64/apps").mkdir(parents=True, exist_ok=True)
+    (appdir / "usr/share/icons/hicolor/48x48/apps").mkdir(parents=True, exist_ok=True)
+    (appdir / "usr/share/icons/hicolor/32x32/apps").mkdir(parents=True, exist_ok=True)
+    (appdir / "usr/share/icons/hicolor/16x16/apps").mkdir(parents=True, exist_ok=True)
     
     # Copy executable
     shutil.copy("dist/mitotic-spindle-tool", appdir / "usr/bin/")
+    
+    # Copy icons at various sizes for proper desktop integration
+    icons_dir = Path("icons")
+    icon_sizes = {
+        "512x512": "EltingLabSpindle_512x512.png",
+        "256x256": "EltingLabSpindle_256x256.png", 
+        "128x128": "EltingLabSpindle_128x128.png",
+        "64x64": "EltingLabSpindle_64x64.png",
+        "48x48": "EltingLabSpindle_48x48.png",
+        "32x32": "EltingLabSpindle_32x32.png",
+        "16x16": "EltingLabSpindle_16x16.png"
+    }
+    
+    icons_copied = False
+    for size, filename in icon_sizes.items():
+        icon_path = icons_dir / filename
+        if icon_path.exists():
+            dest_path = appdir / f"usr/share/icons/hicolor/{size}/apps/mitotic-spindle-tool.png"
+            shutil.copy(icon_path, dest_path)
+            print(f"[SUCCESS] Copied icon {filename} to AppImage")
+            icons_copied = True
+    
+    # Copy main icon to AppDir root for AppImage integration
+    main_icon_candidates = [
+        icons_dir / "EltingLabSpindle_256x256.png",
+        icons_dir / "EltingLabSpindle_128x128.png", 
+        icons_dir / "EltingLabSpindle_512x512.png"
+    ]
+    
+    for icon_path in main_icon_candidates:
+        if icon_path.exists():
+            shutil.copy(icon_path, appdir / "mitotic-spindle-tool.png")
+            print(f"[SUCCESS] Copied main icon {icon_path.name} to AppImage root")
+            break
+    
+    if not icons_copied:
+        print("[WARNING] No icons were copied to AppImage - application may not show proper icon in desktop environments")
     
     # Create desktop file
     desktop_content = """[Desktop Entry]
@@ -301,7 +348,12 @@ Categories=Science;Education;
 Terminal=false
 """
     
+    # Write desktop file to the standard location
     with open(appdir / "usr/share/applications/mitotic-spindle-tool.desktop", 'w') as f:
+        f.write(desktop_content)
+    
+    # Also write desktop file to AppDir root (required by AppImage)
+    with open(appdir / "mitotic-spindle-tool.desktop", 'w') as f:
         f.write(desktop_content)
     
     # Create AppRun
@@ -362,7 +414,7 @@ def prepare_icons():
 def main():
     """Main build function"""
     print("=" * 60)
-    print("Building Mitotic Spindle Tool")
+    print(f"Building Mitotic Spindle Tool {VERSION_DISPLAY}")
     print(f"Platform: {platform.system()} {platform.machine()}")
     print("=" * 60)
     

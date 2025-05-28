@@ -5,6 +5,11 @@ Setup script for Mitotic Spindle Tool
 
 from setuptools import setup, find_packages
 import os
+import sys
+
+# Add src to path to import version
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+from version import __version__
 
 # Read the README file
 def read_readme():
@@ -18,7 +23,7 @@ def read_requirements():
 
 setup(
     name="mitotic-spindle-tool",
-    version="1.1.0",
+    version=__version__,
     author="Kergan Sanderson, Joe Lannan",
     author_email="",
     description="An image analysis Python GUI application for mitotic spindle analysis",

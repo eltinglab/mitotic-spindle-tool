@@ -29,4 +29,37 @@ Click on a column to show a plot of the data
 
 Click row to select that frame to edit
 
-Run all button that probably will make a mess
+# Development
+
+## Version Management
+
+This project uses centralized version management. The version is defined once in `src/version.py` and automatically used by all other components.
+
+### Updating Version
+
+Use the provided script to update versions:
+
+```bash
+# Set specific version
+python3 update_version.py 1.2.0
+
+# Bump version semantically
+python3 update_version.py --bump patch   # 1.1.0 → 1.1.1
+python3 update_version.py --bump minor   # 1.1.0 → 1.2.0  
+python3 update_version.py --bump major   # 1.1.0 → 2.0.0
+```
+
+This automatically updates:
+- `src/version.py` (source of truth)
+- `pyproject.toml` (for compatibility)
+- GUI displays the version automatically via import
+
+## Building
+
+Use the cross-platform build script:
+
+```bash
+python3 build.py
+```
+
+This creates executables for your platform and attempts to create AppImage on Linux.
