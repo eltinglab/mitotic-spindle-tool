@@ -104,7 +104,7 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget
+        sudo apt-get install -y wget imagemagick
         # Install appimagetool for AppImage creation
         wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x appimagetool
