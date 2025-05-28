@@ -4,6 +4,16 @@ on:
   pull_request:
     branches: [ main, develop ]
     types: [opened, synchronize, reopened]
+    paths:
+      - 'src/**'
+      - 'requirements.txt'
+      - 'build.py'
+      - 'build-linux.sh'
+      - 'build-windows.bat'
+      - 'mitotic-spindle-tool.spec'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - '.github/workflows/pr-build.yml'
 
 jobs:
   pr-info:
