@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build release for'
+        description: 'Tag to build release for (e.g., v1.1.3 or "latest" for most recent tag)'
         required: true
         default: 'latest'
 
