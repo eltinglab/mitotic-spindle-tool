@@ -283,6 +283,13 @@ def create_appimage():
     
     print("Creating AppImage...")
     
+    # Set environment variables for CI compatibility
+    env = os.environ.copy()
+    env["ARCH"] = "x86_64"
+    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
+        # Disable FUSE in CI environments where it might not be available
+        env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
+    
     # Create AppDir structure
     appdir = Path("dist/AppDir")
     appdir.mkdir(exist_ok=True)
@@ -299,6 +306,8 @@ def create_appimage():
     
     # Copy executable
     shutil.copy("dist/mitotic-spindle-tool", appdir / "usr/bin/")
+    # Ensure executable has proper permissions
+    os.chmod(appdir / "usr/bin/mitotic-spindle-tool", 0o755)
     
     # Copy icons at various sizes for proper desktop integration
     icons_dir = Path("icons")
@@ -368,21 +377,48 @@ exec "${HERE}/usr/bin/mitotic-spindle-tool" "$@"
     os.chmod(apprun_path, 0o755)
     
     # Create AppImage
+    current_dir = os.getcwd()
     try:
         os.chdir("dist")
-        run_command(["appimagetool", "AppDir", "mitotic-spindle-tool.AppImage"])
-        os.chdir("..")
+        
+        # Make sure executable is executable
+        executable_path = "AppDir/usr/bin/mitotic-spindle-tool"
+        if os.path.exists(executable_path):
+            os.chmod(executable_path, 0o755)
+        
+        # Run appimagetool with more verbose output and error handling
+        print("Running appimagetool...")
+        result = subprocess.run(
+            ["appimagetool", "--verbose", "AppDir", "mitotic-spindle-tool.AppImage"], 
+            env=env, 
+            check=False, 
+            capture_output=True, 
+            text=True
+        )
+        
+        # Print output for debugging
+        if result.stdout:
+            print(f"[INFO] appimagetool stdout: {result.stdout}")
+        if result.stderr:
+            print(f"[ERROR] appimagetool stderr: {result.stderr}")
+        
+        print(f"[INFO] appimagetool exit code: {result.returncode}")
+        
+        os.chdir(current_dir)
         
         appimage_path = Path("dist/mitotic-spindle-tool.AppImage")
-        if appimage_path.exists():
+        if result.returncode == 0 and appimage_path.exists():
             os.chmod(appimage_path, 0o755)
             print(f"[SUCCESS] Created AppImage: {appimage_path}")
             return appimage_path
+        else:
+            print(f"[WARNING] AppImage creation failed - appimagetool exit code: {result.returncode}")
+            return None
+            
     except Exception as e:
-        print(f"[WARNING] AppImage creation failed: {e}")
-        os.chdir("..")
-    
-    return None
+        os.chdir(current_dir)
+        print(f"[WARNING] AppImage creation failed with exception: {e}")
+        return None
 
 def prepare_icons():
     """Prepare and verify icons for the build process"""

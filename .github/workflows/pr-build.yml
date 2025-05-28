@@ -60,7 +60,7 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget
+        sudo apt-get install -y wget fuse libfuse2
         # Install appimagetool for AppImage creation
         echo "📥 Downloading appimagetool..."
         wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
