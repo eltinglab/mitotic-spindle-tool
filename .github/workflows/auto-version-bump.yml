@@ -1,0 +1,71 @@
+name: Auto Version Bump on Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  auto-bump:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Configure git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+    
+    - name: Determine version bump type from PR title
+      id: bump_type
+      run: |
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        
+        # Check PR title for version bump indicators
+        if [[ "$PR_TITLE" =~ \[major\]|\[MAJOR\]|BREAKING|breaking ]]; then
+          echo "bump_type=major" >> $GITHUB_OUTPUT
+          echo "Detected MAJOR version bump from PR title"
+        elif [[ "$PR_TITLE" =~ \[minor\]|\[MINOR\]|feat:|feature: ]]; then
+          echo "bump_type=minor" >> $GITHUB_OUTPUT
+          echo "Detected MINOR version bump from PR title"
+        else
+          echo "bump_type=patch" >> $GITHUB_OUTPUT
+          echo "Defaulting to PATCH version bump"
+        fi
+    
+    - name: Auto-bump version
+      run: |
+        BUMP_TYPE="${{ steps.bump_type.outputs.bump_type }}"
+        
+        # Get current version
+        CURRENT_VERSION=$(python3 -c "import sys; sys.path.insert(0, 'src'); from version import __version__; print(__version__)")
+        
+        # Bump version
+        python3 update_version.py --bump $BUMP_TYPE
+        
+        # Get new version
+        NEW_VERSION=$(python3 -c "import sys; sys.path.insert(0, 'src'); from version import __version__; print(__version__)")
+        
+        echo "Auto-bumped version: $CURRENT_VERSION → $NEW_VERSION ($BUMP_TYPE)"
+        
+        # Commit version bump
+        git add src/version.py pyproject.toml
+        git commit -m "🚀 Auto-bump version to v$NEW_VERSION ($BUMP_TYPE)
+
+        Triggered by PR: ${{ github.event.pull_request.title }}
+        PR #${{ github.event.pull_request.number }} by @${{ github.event.pull_request.user.login }}"
+        
+        git push origin main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

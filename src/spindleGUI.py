@@ -13,6 +13,7 @@ import curveFitData as cFD
 import plotSpindle as pS
 import plotDialog as pD
 import manualSpindleDialog as mSD
+from version import VERSION_DISPLAY
 import os
 from numpy import zeros, arange
 import matplotlib.pyplot as plt
@@ -37,7 +38,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Mitotic Spindle Image Analysis")
         
         # Update the version for new releases
-        versionNumber = "v1.0.2"
+        versionNumber = VERSION_DISPLAY
         
         # keep track of the open file name
         self.fileName = None

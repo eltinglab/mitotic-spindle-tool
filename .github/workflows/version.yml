@@ -47,8 +47,8 @@ jobs:
     - name: Get current version
       id: current_version
       run: |
-        # Extract version from setup.py
-        CURRENT_VERSION=$(grep -E "version\s*=\s*['\"]" setup.py | sed -E "s/.*version\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+        # Extract version from src/version.py
+        CURRENT_VERSION=$(python3 -c "import sys; sys.path.insert(0, 'src'); from version import __version__; print(__version__)")
         echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
         echo "Current version: $CURRENT_VERSION"
         
@@ -92,20 +92,14 @@ jobs:
       run: |
         NEW_VERSION="${{ steps.version.outputs.new_version }}"
         
-        # Update setup.py
-        sed -i "s/version=\"[^\"]*\"/version=\"$NEW_VERSION\"/g" setup.py
-        
-        # Update pyproject.toml
-        sed -i "s/version = \"[^\"]*\"/version = \"$NEW_VERSION\"/g" pyproject.toml
-        
-        # Update version in spindleGUI.py
-        sed -i "s/versionNumber = \"v[^\"]*\"/versionNumber = \"v$NEW_VERSION\"/g" src/spindleGUI.py
+        # Use the centralized version update script
+        python3 update_version.py "$NEW_VERSION"
         
     - name: Create version update commit
       run: |
         NEW_VERSION="${{ steps.version.outputs.new_version }}"
         
-        git add setup.py pyproject.toml src/spindleGUI.py
+        git add src/version.py pyproject.toml
         git commit -m "Bump version to v$NEW_VERSION"
         
     - name: Create and push tag

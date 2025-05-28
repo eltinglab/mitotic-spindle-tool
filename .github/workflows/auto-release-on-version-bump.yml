@@ -27,8 +27,8 @@ jobs:
     - name: Get current version
       id: current_version
       run: |
-        # Extract version from setup.py
-        CURRENT_VERSION=$(grep -E "version\s*=\s*['\"]" setup.py | sed -E "s/.*version\s*=\s*['\"]([^'\"]+)['\"].*/\1/")
+        # Extract version from src/version.py
+        CURRENT_VERSION=$(python3 -c "import sys; sys.path.insert(0, 'src'); from version import __version__; print(__version__)")
         echo "current_version=v$CURRENT_VERSION" >> $GITHUB_OUTPUT
         echo "Current version: v$CURRENT_VERSION"
     
@@ -101,7 +101,11 @@ jobs:
         $COMMIT_SHA
 
         ### Downloads
-        Executables for all platforms will be available once the release build completes.
+        Executables for all platforms will be available once the release build completes:
+        - **Windows**: \`mitotic-spindle-tool.exe\` (standalone executable)
+        - **Linux (AppImage)**: \`mitotic-spindle-tool.AppImage\` (portable, recommended)
+        - **Linux (Traditional)**: \`mitotic-spindle-tool-linux.tar.gz\` (includes launcher script)
+        - **macOS**: \`mitotic-spindle-tool-macos.dmg\` (disk image)
 
         This release was automatically created when PR #$PR_NUMBER was merged with a version bump."
         else
@@ -117,7 +121,11 @@ jobs:
         $COMMIT_SHA
 
         ### Downloads
-        Executables for all platforms will be available once the release build completes.
+        Executables for all platforms will be available once the release build completes:
+        - **Windows**: \`mitotic-spindle-tool.exe\` (standalone executable)
+        - **Linux (AppImage)**: \`mitotic-spindle-tool.AppImage\` (portable, recommended)
+        - **Linux (Traditional)**: \`mitotic-spindle-tool-linux.tar.gz\` (includes launcher script)
+        - **macOS**: \`mitotic-spindle-tool-macos.dmg\` (disk image)
 
         This release was automatically created when the version was bumped in commit $COMMIT_SHA."
         fi

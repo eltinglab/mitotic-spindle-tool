@@ -72,15 +72,18 @@ jobs:
         
         ### Downloads
         - **Windows**: \`mitotic-spindle-tool.exe\` (standalone executable)
-        - **Linux**: \`mitotic-spindle-tool-linux.tar.gz\` (includes launcher script)
+        - **Linux (Traditional)**: \`mitotic-spindle-tool-linux.tar.gz\` (includes launcher script)
+        - **Linux (AppImage)**: \`mitotic-spindle-tool.AppImage\` (portable, recommended for Linux)
         - **macOS**: \`mitotic-spindle-tool-macos.dmg\` (disk image)
-        - **Linux AppImage**: \`mitotic-spindle-tool.AppImage\` (portable)
         
         ### Installation
         - **Windows**: Download and run \`mitotic-spindle-tool.exe\` directly
-        - **Linux**: Extract \`mitotic-spindle-tool-linux.tar.gz\` and run \`./run-mitotic-spindle-tool.sh\`
+        - **Linux (Traditional)**: Extract \`mitotic-spindle-tool-linux.tar.gz\` and run \`./run-mitotic-spindle-tool.sh\`
+        - **Linux (AppImage)**: Download \`mitotic-spindle-tool.AppImage\`, make executable (\`chmod +x mitotic-spindle-tool.AppImage\`) and run directly
         - **macOS**: Open \`mitotic-spindle-tool-macos.dmg\` and run the application
-        - **Linux AppImage**: Download and run \`./mitotic-spindle-tool.AppImage\` directly
+        
+        ### About AppImage (Linux Users)
+        The AppImage format provides a portable application that runs on most Linux distributions without installation. Just download, make executable, and run! The AppImage includes all dependencies and proper desktop integration with icons.
         
         ### Changes
         See the commit history for detailed changes in this release.
