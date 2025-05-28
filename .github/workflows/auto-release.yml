@@ -1,0 +1,57 @@
+name: Auto Release on PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  auto-release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Get latest tag
+      id: get_latest_tag
+      run: |
+        latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+        echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+        echo "Latest tag: $latest_tag"
+    
+    - name: Generate next version
+      id: next_version
+      run: |
+        latest_tag="${{ steps.get_latest_tag.outputs.latest_tag }}"
+        # Remove 'v' prefix if present
+        version=${latest_tag#v}
+        
+        # Split version into parts
+        IFS='.' read -r major minor patch <<< "$version"
+        
+        # Increment patch version
+        patch=$((patch + 1))
+        
+        new_version="v${major}.${minor}.${patch}"
+        echo "new_version=$new_version" >> $GITHUB_OUTPUT
+        echo "Next version: $new_version"
+    
+    - name: Create and push tag
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        new_version="${{ steps.next_version.outputs.new_version }}"
+        pr_title="${{ github.event.pull_request.title }}"
+        pr_number="${{ github.event.pull_request.number }}"
+        
+        git tag -a "$new_version" -m "Release $new_version - $pr_title (PR #$pr_number)"
+        git push origin "$new_version"
+        
+        echo "Created and pushed tag: $new_version"

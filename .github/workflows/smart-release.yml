@@ -1,0 +1,112 @@
+name: Smart Release on PR Merge
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  smart-release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Check if release needed
+      id: check_release
+      run: |
+        # Check PR labels to determine release type
+        pr_labels="${{ toJson(github.event.pull_request.labels.*.name) }}"
+        echo "PR Labels: $pr_labels"
+        
+        # Default to patch release
+        release_type="patch"
+        
+        if echo "$pr_labels" | grep -q "major"; then
+          release_type="major"
+        elif echo "$pr_labels" | grep -q "minor"; then
+          release_type="minor"
+        elif echo "$pr_labels" | grep -q "patch"; then
+          release_type="patch"
+        elif echo "$pr_labels" | grep -q "no-release"; then
+          echo "Skipping release due to 'no-release' label"
+          echo "skip_release=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        echo "release_type=$release_type" >> $GITHUB_OUTPUT
+        echo "Release type: $release_type"
+    
+    - name: Get latest tag
+      id: get_latest_tag
+      if: steps.check_release.outputs.skip_release != 'true'
+      run: |
+        latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")
+        echo "latest_tag=$latest_tag" >> $GITHUB_OUTPUT
+        echo "Latest tag: $latest_tag"
+    
+    - name: Calculate next version
+      id: next_version
+      if: steps.check_release.outputs.skip_release != 'true'
+      run: |
+        latest_tag="${{ steps.get_latest_tag.outputs.latest_tag }}"
+        release_type="${{ steps.check_release.outputs.release_type }}"
+        
+        # Remove 'v' prefix if present
+        version=${latest_tag#v}
+        
+        # Split version into parts
+        IFS='.' read -r major minor patch <<< "$version"
+        
+        # Increment based on release type
+        case $release_type in
+          "major")
+            major=$((major + 1))
+            minor=0
+            patch=0
+            ;;
+          "minor")
+            minor=$((minor + 1))
+            patch=0
+            ;;
+          "patch")
+            patch=$((patch + 1))
+            ;;
+        esac
+        
+        new_version="v${major}.${minor}.${patch}"
+        echo "new_version=$new_version" >> $GITHUB_OUTPUT
+        echo "Next version: $new_version"
+    
+    - name: Create release tag
+      if: steps.check_release.outputs.skip_release != 'true'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        new_version="${{ steps.next_version.outputs.new_version }}"
+        pr_title="${{ github.event.pull_request.title }}"
+        pr_number="${{ github.event.pull_request.number }}"
+        pr_author="${{ github.event.pull_request.user.login }}"
+        
+        # Create comprehensive release message
+        release_message="Release $new_version
+
+## Changes
+- $pr_title (PR #$pr_number by @$pr_author)
+
+## Commit
+${{ github.event.pull_request.merge_commit_sha }}
+
+This release was automatically created when PR #$pr_number was merged."
+        
+        git tag -a "$new_version" -m "$release_message"
+        git push origin "$new_version"
+        
+        echo "✅ Created and pushed tag: $new_version"

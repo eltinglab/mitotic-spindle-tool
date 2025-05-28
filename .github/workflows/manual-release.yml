@@ -1,0 +1,55 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.4)'
+        required: true
+        default: 'v1.0.4'
+      release_notes:
+        description: 'Release notes'
+        required: false
+        default: 'New release with bug fixes and improvements'
+
+jobs:
+  manual-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Validate version format
+      run: |
+        version="${{ github.event.inputs.version }}"
+        if [[ ! $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "Error: Version must be in format v1.2.3"
+          exit 1
+        fi
+        echo "Version format is valid: $version"
+    
+    - name: Check if tag exists
+      run: |
+        version="${{ github.event.inputs.version }}"
+        if git rev-parse "$version" >/dev/null 2>&1; then
+          echo "Error: Tag $version already exists"
+          exit 1
+        fi
+        echo "Tag $version is available"
+    
+    - name: Create and push tag
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        version="${{ github.event.inputs.version }}"
+        release_notes="${{ github.event.inputs.release_notes }}"
+        
+        git tag -a "$version" -m "Release $version - $release_notes"
+        git push origin "$version"
+        
+        echo "Created and pushed tag: $version"
