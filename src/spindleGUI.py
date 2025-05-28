@@ -1,6 +1,5 @@
 import sys
-from PySide6.QtWidgets impo        # Update the version for new releases
-        versionNumber = "v1.0.7" (QApplication, QCheckBox, QMainWindow, QPushButton, QLabel,
+from PySide6.QtWidgets import (QApplication, QCheckBox, QMainWindow, QPushButton, QLabel,
                                QSpinBox, QTableView, QWidget, QVBoxLayout,
                                QHBoxLayout, QGridLayout, QSizePolicy,
                                QFileDialog, QSplitter, QFrame, QSplitterHandle,
@@ -38,7 +37,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Mitotic Spindle Image Analysis")
         
         # Update the version for new releases
-        versionNumber = "v1.0.4"
+        versionNumber = "v1.0.7"
         
         # keep track of the open file name
         self.fileName = None

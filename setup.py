@@ -1,6 +1,4 @@
-#!/usr/bin/env pytsetup(
-    name="mitotic-spindle-tool",
-    version="1.0.7",3
+#!/usr/bin/env python3
 """
 Setup script for Mitotic Spindle Tool
 """
@@ -20,7 +18,7 @@ def read_requirements():
 
 setup(
     name="mitotic-spindle-tool",
-    version="1.0.2",
+    version="1.0.7",
     author="Kergan Sanderson, Joe Lannan",
     author_email="",
     description="An image analysis Python GUI application for mitotic spindle analysis",
@@ -35,7 +33,6 @@ setup(
         "plotSpindle",
         "plotDialog",
         "manualSpindleDialog",
-        "spindlePreviewDialog",
         "threshFunctions",
         "tiffFunctions"
     ],

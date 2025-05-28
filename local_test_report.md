@@ -19,10 +19,7 @@ Distribution package created successfully.
 
 ## Files Created
 ```
-mitotic-spindle-tool             156.70 MB
-run-mitotic-spindle-tool.sh        0.00 MB
-mitotic-spindle-tool-linux.tar.gz   155.14 MB
-test-package.tar.gz              155.14 MB
+test-package.tar.gz                0.00 MB
 ```
 
 ## Next Steps

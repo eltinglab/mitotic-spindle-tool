@@ -95,6 +95,17 @@ jobs:
         pr_number="${{ github.event.pull_request.number }}"
         pr_author="${{ github.event.pull_request.user.login }}"
         
+        # Check if tag already exists locally or remotely
+        if git rev-parse "$new_version" >/dev/null 2>&1; then
+          echo "❌ Tag $new_version already exists locally, skipping release"
+          exit 0
+        fi
+        
+        if git ls-remote --tags origin | grep -q "refs/tags/$new_version$"; then
+          echo "❌ Tag $new_version already exists on remote, skipping release"
+          exit 0
+        fi
+        
         # Create comprehensive release message
         release_message="Release $new_version - $pr_title (PR #$pr_number by @$pr_author) - Commit: ${{ github.event.pull_request.merge_commit_sha }}"
         
