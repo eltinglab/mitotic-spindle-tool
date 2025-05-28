@@ -206,6 +206,12 @@ def create_distribution_package(executable_path, launcher_path):
             shutil.copy2(executable_path, dmg_temp_dir / executable_path.name)
             shutil.copy2(launcher_path, dmg_temp_dir / launcher_path.name)
             
+            # Copy icon to DMG if available
+            icon_path = Path("icons/EltingLabSpindle_256x256.png")
+            if icon_path.exists():
+                shutil.copy2(icon_path, dmg_temp_dir / "EltingLabSpindle.png")
+                print(f"[SUCCESS] Added icon to DMG: {icon_path}")
+            
             # Create DMG using hdiutil (macOS built-in tool)
             run_command([
                 "hdiutil", "create", 
@@ -231,6 +237,10 @@ def create_distribution_package(executable_path, launcher_path):
             with tarfile.open(package_path, 'w:gz') as tarf:
                 tarf.add(executable_path, executable_path.name)
                 tarf.add(launcher_path, launcher_path.name)
+                # Add icon if available
+                icon_path = Path("icons/EltingLabSpindle_256x256.png")
+                if icon_path.exists():
+                    tarf.add(icon_path, "EltingLabSpindle.png")
             
             print(f"[SUCCESS] Created package: {package_path}")
             return package_path
@@ -244,6 +254,10 @@ def create_distribution_package(executable_path, launcher_path):
         with tarfile.open(package_path, 'w:gz') as tarf:
             tarf.add(executable_path, executable_path.name)
             tarf.add(launcher_path, launcher_path.name)
+            # Add icon if available
+            icon_path = Path("icons/EltingLabSpindle_256x256.png")
+            if icon_path.exists():
+                tarf.add(icon_path, "EltingLabSpindle.png")
         
         print(f"[SUCCESS] Created package: {package_path}")
         
