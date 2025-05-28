@@ -5,7 +5,7 @@ This is the single source of truth for version information.
 All other files should import from here.
 """
 
-__version__ = "1.10.1"
+__version__ = "1.1.1"
 __version_info__ = tuple(map(int, __version__.split('.')))
 
 # For display purposes (with 'v' prefix)
