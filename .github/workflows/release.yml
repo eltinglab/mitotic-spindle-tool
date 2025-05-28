@@ -33,15 +33,16 @@ jobs:
         RELEASE_BODY="## Mitotic Spindle Tool ${{ steps.get_tag.outputs.tag_name }}
         
         ### Downloads
-        - **Windows**: \`mitotic-spindle-tool-windows.zip\`
-        - **Linux**: \`mitotic-spindle-tool-linux.tar.gz\`
-        - **macOS**: \`mitotic-spindle-tool-macos.tar.gz\`
-        - **Linux AppImage**: \`mitotic-spindle-tool.AppImage\`
+        - **Windows**: \`mitotic-spindle-tool.exe\` (standalone executable)
+        - **Linux**: \`mitotic-spindle-tool-linux.tar.gz\` (includes launcher script)
+        - **macOS**: \`mitotic-spindle-tool-macos.dmg\` (disk image)
+        - **Linux AppImage**: \`mitotic-spindle-tool.AppImage\` (portable)
         
         ### Installation
-        1. Download the appropriate package for your operating system
-        2. Extract the archive (Windows/Linux) or run the AppImage directly (Linux)
-        3. Run the executable or use the provided launcher script
+        - **Windows**: Download and run \`mitotic-spindle-tool.exe\` directly
+        - **Linux**: Extract \`mitotic-spindle-tool-linux.tar.gz\` and run \`./run-mitotic-spindle-tool.sh\`
+        - **macOS**: Open \`mitotic-spindle-tool-macos.dmg\` and run the application
+        - **Linux AppImage**: Download and run \`./mitotic-spindle-tool.AppImage\` directly
         
         ### Changes
         See the commit history for detailed changes in this release.
@@ -74,11 +75,11 @@ jobs:
           - os: windows-latest
             platform: windows
             executable: mitotic-spindle-tool.exe
-            package: mitotic-spindle-tool-windows.zip
+            package: mitotic-spindle-tool.exe
           - os: macos-latest
             platform: macos
             executable: mitotic-spindle-tool
-            package: mitotic-spindle-tool-macos.tar.gz
+            package: mitotic-spindle-tool-macos.dmg
             
     runs-on: ${{ matrix.os }}
     
@@ -137,19 +138,54 @@ jobs:
       run: |
         cd dist
         if [[ "${{ matrix.platform }}" == "windows" ]]; then
-          # Create Windows ZIP package
-          powershell -command "Compress-Archive -Path '${{ matrix.executable }}', 'run-mitotic-spindle-tool.bat' -DestinationPath '${{ matrix.package }}'"
+          # Windows - no packaging needed, just use the .exe directly
+          echo "Windows executable ready: ${{ matrix.executable }}"
+        elif [[ "${{ matrix.platform }}" == "macos" ]]; then
+          # macOS - create DMG if possible, otherwise tar.gz
+          if command -v hdiutil >/dev/null 2>&1; then
+            mkdir -p dmg_temp
+            cp ${{ matrix.executable }} dmg_temp/
+            cp run-mitotic-spindle-tool.sh dmg_temp/
+            hdiutil create -volname "Mitotic Spindle Tool" \
+              -srcfolder dmg_temp -ov -format UDZO \
+              ${{ matrix.package }} || \
+            tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
+            rm -rf dmg_temp
+          else
+            # Fallback to tar.gz
+            tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
+          fi
         else
-          # Create tar.gz package for Unix systems
+          # Linux - create tar.gz with executable and launcher
           tar -czf ${{ matrix.package }} ${{ matrix.executable }} run-mitotic-spindle-tool.sh
         fi
         cd ..
         
     - name: Upload release asset
+      shell: bash
       run: |
-        gh release upload ${{ needs.create-release.outputs.tag_name }} \
-          ./dist/${{ matrix.package }} \
-          --clobber
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          # Windows - upload the .exe directly
+          gh release upload ${{ needs.create-release.outputs.tag_name }} \
+            ./dist/${{ matrix.executable }} \
+            --clobber
+        elif [[ "${{ matrix.platform }}" == "macos" ]]; then
+          # macOS - upload DMG if it exists, otherwise tar.gz
+          if [[ -f "./dist/${{ matrix.package }}" ]]; then
+            gh release upload ${{ needs.create-release.outputs.tag_name }} \
+              ./dist/${{ matrix.package }} \
+              --clobber
+          elif [[ -f "./dist/mitotic-spindle-tool-macos.tar.gz" ]]; then
+            gh release upload ${{ needs.create-release.outputs.tag_name }} \
+              ./dist/mitotic-spindle-tool-macos.tar.gz \
+              --clobber
+          fi
+        else
+          # Linux - upload tar.gz
+          gh release upload ${{ needs.create-release.outputs.tag_name }} \
+            ./dist/${{ matrix.package }} \
+            --clobber
+        fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         

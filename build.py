@@ -181,34 +181,72 @@ cd "$SCRIPT_DIR"
     return launcher_path
 
 def create_distribution_package(executable_path, launcher_path):
-    """Create distribution package"""
+    """Create distribution package according to platform conventions"""
     print("Creating distribution package...")
     
     system = platform.system().lower()
     dist_path = Path("dist")
     
     if system == "windows":
-        # Create ZIP package
-        package_name = "mitotic-spindle-tool-windows.zip"
+        # Windows - no packaging needed, just provide the .exe
+        print(f"[SUCCESS] Windows executable ready: {executable_path}")
+        return executable_path
+        
+    elif system == "darwin":
+        # macOS - create DMG file
+        package_name = "mitotic-spindle-tool-macos.dmg"
         package_path = dist_path / package_name
         
-        import zipfile
-        with zipfile.ZipFile(package_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            zipf.write(executable_path, executable_path.name)
-            zipf.write(launcher_path, launcher_path.name)
+        try:
+            # Create a temporary directory for DMG contents
+            dmg_temp_dir = dist_path / "dmg_temp"
+            dmg_temp_dir.mkdir(exist_ok=True)
+            
+            # Copy executable and launcher to temp directory
+            shutil.copy2(executable_path, dmg_temp_dir / executable_path.name)
+            shutil.copy2(launcher_path, dmg_temp_dir / launcher_path.name)
+            
+            # Create DMG using hdiutil (macOS built-in tool)
+            run_command([
+                "hdiutil", "create", 
+                "-volname", "Mitotic Spindle Tool",
+                "-srcfolder", str(dmg_temp_dir),
+                "-ov", "-format", "UDZO",
+                str(package_path)
+            ])
+            
+            # Clean up temp directory
+            shutil.rmtree(dmg_temp_dir)
+            
+            print(f"[SUCCESS] Created DMG: {package_path}")
+            return package_path
+            
+        except subprocess.CalledProcessError as e:
+            print(f"[WARNING] DMG creation failed: {e}, falling back to tar.gz")
+            # Fallback to tar.gz on macOS if DMG creation fails
+            package_name = "mitotic-spindle-tool-macos.tar.gz"
+            package_path = dist_path / package_name
+            
+            import tarfile
+            with tarfile.open(package_path, 'w:gz') as tarf:
+                tarf.add(executable_path, executable_path.name)
+                tarf.add(launcher_path, launcher_path.name)
+            
+            print(f"[SUCCESS] Created package: {package_path}")
+            return package_path
         
     else:
-        # Create tar.gz package
-        package_name = f"mitotic-spindle-tool-{system}.tar.gz"
+        # Linux - create tar.gz with executable and launcher
+        package_name = "mitotic-spindle-tool-linux.tar.gz"
         package_path = dist_path / package_name
         
         import tarfile
         with tarfile.open(package_path, 'w:gz') as tarf:
             tarf.add(executable_path, executable_path.name)
             tarf.add(launcher_path, launcher_path.name)
-    
-    print(f"[SUCCESS] Created package: {package_path}")
-    return package_path
+        
+        print(f"[SUCCESS] Created package: {package_path}")
+        return package_path
 
 def create_appimage():
     """Create AppImage for Linux (if tools are available)"""

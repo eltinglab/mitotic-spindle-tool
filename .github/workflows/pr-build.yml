@@ -124,10 +124,26 @@ jobs:
       run: |
         cd dist
         if [[ "${{ matrix.platform }}" == "windows" ]]; then
-          # Windows - create ZIP with executable and launcher
-          powershell -command "Compress-Archive -Path '${{ matrix.executable }}', 'run-mitotic-spindle-tool.bat' -DestinationPath 'mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.zip'"
+          # Windows - just upload the raw .exe (no packaging needed)
+          echo "Windows executable ready for upload: ${{ matrix.executable }}"
+        elif [[ "${{ matrix.platform }}" == "macos" ]]; then
+          # macOS - create DMG if possible, otherwise tar.gz
+          if command -v hdiutil >/dev/null 2>&1; then
+            # Try to create DMG
+            mkdir -p dmg_temp
+            cp ${{ matrix.executable }} dmg_temp/
+            cp run-mitotic-spindle-tool.sh dmg_temp/
+            hdiutil create -volname "Mitotic Spindle Tool PR${{ needs.pr-info.outputs.pr_number }}" \
+              -srcfolder dmg_temp -ov -format UDZO \
+              mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.dmg || \
+            tar -czf mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
+            rm -rf dmg_temp
+          else
+            # Fallback to tar.gz
+            tar -czf mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
+          fi
         else
-          # Linux/macOS - create tar.gz with executable and launcher  
+          # Linux - create tar.gz with executable and launcher  
           tar -czf mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
         fi
         cd ..
@@ -141,6 +157,7 @@ jobs:
           dist/run-mitotic-spindle-tool.*
           dist/mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.*
           dist/mitotic-spindle-tool-${{ matrix.platform }}.tar.gz
+          dist/mitotic-spindle-tool-${{ matrix.platform }}.dmg
           dist/mitotic-spindle-tool.AppImage
           build_report.md
         retention-days: 30

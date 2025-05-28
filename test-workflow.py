@@ -51,7 +51,7 @@ def test_imports():
     print("Testing Import Step")
     print("="*50)
     
-    modules = ["spindleGUI", "curveFitData", "plotSpindle", "plotDialog", "manualSpindleDialog", "spindlePreviewDialog"]
+    modules = ["spindleGUI", "curveFitData", "plotSpindle", "plotDialog", "manualSpindleDialog", "threshFunctions", "tiffFunctions"]
     
     original_cwd = os.getcwd()
     try:
