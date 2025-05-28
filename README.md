@@ -6,6 +6,10 @@ An image analysis Python GUI application for use in Dr. Elting's lab at NCSU.
 - [Joe Lannan](https://github.com/joe-lannan)
 
 # Install
+## Packaged Executables
+[Get the latest release here](https://github.com/eltinglab/mitotic-spindle-tool/releases/latest)
+
+## Manual Install
 ### Requirements: [Python](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) and [Git](https://git-scm.com/downloads)
 
 open terminal
