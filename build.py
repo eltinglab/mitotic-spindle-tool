@@ -193,12 +193,27 @@ def create_distribution_package(executable_path, launcher_path):
         return executable_path
         
     elif system == "darwin":
-        # macOS - create DMG file
+        # macOS - create branded DMG file
         package_name = "mitotic-spindle-tool-macos.dmg"
         package_path = dist_path / package_name
         
         try:
-            # Create a temporary directory for DMG contents
+            # Try using enhanced DMG creation script first
+            create_dmg_script = Path("create_dmg.py")
+            if create_dmg_script.exists():
+                print("Using enhanced DMG creation...")
+                result = run_command([
+                    sys.executable, str(create_dmg_script), 
+                    str(executable_path), str(package_path)
+                ], check=False)
+                
+                if result.returncode == 0 and package_path.exists():
+                    print(f"[SUCCESS] Created branded DMG: {package_path}")
+                    return package_path
+                else:
+                    print("[WARNING] Enhanced DMG creation failed, falling back to basic DMG")
+            
+            # Fallback to basic DMG creation
             dmg_temp_dir = dist_path / "dmg_temp"
             dmg_temp_dir.mkdir(exist_ok=True)
             
@@ -206,7 +221,12 @@ def create_distribution_package(executable_path, launcher_path):
             shutil.copy2(executable_path, dmg_temp_dir / executable_path.name)
             shutil.copy2(launcher_path, dmg_temp_dir / launcher_path.name)
             
-            # Create DMG using hdiutil (macOS built-in tool)
+            # Copy icon for DMG
+            icon_source = Path("icons/EltingLabSpindle_512x512.png")
+            if icon_source.exists():
+                shutil.copy2(icon_source, dmg_temp_dir / "icon.png")
+            
+            # Create basic DMG
             run_command([
                 "hdiutil", "create", 
                 "-volname", "Mitotic Spindle Tool",
@@ -312,6 +332,33 @@ exec "${HERE}/usr/bin/mitotic-spindle-tool" "$@"
     
     return None
 
+def prepare_icons():
+    """Prepare and verify icons for the build process"""
+    print("Preparing icons for build...")
+    
+    icons_dir = Path("icons")
+    if not icons_dir.exists():
+        print("[WARNING] Icons directory not found, creating...")
+        icons_dir.mkdir(exist_ok=True)
+        return False
+    
+    required_icons = {
+        "ico": "EltingLabSpindle.ico",  # For Windows executable
+        "png_512": "EltingLabSpindle_512x512.png",  # For DMG
+        "png_256": "EltingLabSpindle_256x256.png",  # Backup for DMG
+    }
+    
+    icons_available = {}
+    for icon_type, filename in required_icons.items():
+        icon_path = icons_dir / filename
+        if icon_path.exists():
+            icons_available[icon_type] = icon_path
+            print(f"[SUCCESS] Found {icon_type} icon: {filename}")
+        else:
+            print(f"[WARNING] Missing {icon_type} icon: {filename}")
+    
+    return icons_available
+
 def main():
     """Main build function"""
     print("=" * 60)
@@ -320,6 +367,9 @@ def main():
     print("=" * 60)
     
     try:
+        # Prepare icons first
+        icons_available = prepare_icons()
+        
         # Setup environment
         pip_executable, python_executable = setup_virtual_environment()
         install_dependencies(pip_executable)
@@ -350,6 +400,14 @@ def main():
         
         if appimage_path:
             print(f"  - AppImage: {appimage_path}")
+        
+        # Show icon status
+        if icons_available:
+            print("\nIcons applied:")
+            for icon_type, icon_path in icons_available.items():
+                print(f"  - {icon_type}: {icon_path.name}")
+        else:
+            print("\n[WARNING] No icons were applied to the build")
         
         print("\nTo run the application:")
         print(f"  {executable_path}")
