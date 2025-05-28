@@ -1,4 +1,6 @@
-[build-system]
+[bui[project]
+name = "mitotic-spindle-tool"
+version = "1.0.7"system]
 requires = ["setuptools>=45", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
