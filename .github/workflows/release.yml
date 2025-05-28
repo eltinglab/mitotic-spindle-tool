@@ -4,10 +4,6 @@ on:
   push:
     tags:
       - 'v*'
-  pull_request:
-    types: [closed]
-    branches:
-      - main
   release:
     types: [published]
   workflow_dispatch:
@@ -19,16 +15,17 @@ on:
 
 jobs:
   create-release:
-    # Only run if it's a tag push, manual dispatch, release event, or merged PR to main
+    # Only run if it's a tag push, manual dispatch, or release event
+    # Remove PR trigger to avoid conflicts with auto-release workflow
     if: |
       github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') ||
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'release' ||
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+      github.event_name == 'release'
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
       tag_name: ${{ steps.get_tag.outputs.tag_name }}
+      release_created: ${{ steps.create_release.outputs.release_created }}
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -42,9 +39,6 @@ jobs:
           else
             TAG_NAME="${{ github.event.inputs.tag }}"
           fi
-        elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-          # For PR merges, get the latest tag (which should have been created by auto-release)
-          TAG_NAME=$(git describe --tags --abbrev=0)
         elif [[ $GITHUB_REF == refs/tags/* ]]; then
           TAG_NAME=${GITHUB_REF#refs/tags/}
         else
@@ -154,11 +148,16 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y wget
+        sudo apt-get install -y wget fuse libfuse2
         # Install appimagetool for AppImage creation
+        echo "📥 Downloading appimagetool..."
         wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
         chmod +x appimagetool
         sudo mv appimagetool /usr/local/bin/
+        echo "✅ appimagetool installed"
+        echo "🔍 Verifying appimagetool installation:"
+        which appimagetool
+        appimagetool --version || echo "Note: appimagetool --version may not work but tool should be functional"
         
     - name: Install dependencies
       run: |
@@ -178,10 +177,26 @@ jobs:
         if [[ -f "dist/${{ matrix.executable }}" ]]; then
           echo "[SUCCESS] Executable built successfully"
           ls -la dist/
+          
+          # Check for AppImage on Linux
+          if [[ "${{ matrix.platform }}" == "linux" ]]; then
+            if [[ -f "dist/mitotic-spindle-tool.AppImage" ]]; then
+              echo "✅ AppImage created successfully"
+              echo "📏 AppImage size: $(du -h dist/mitotic-spindle-tool.AppImage | cut -f1)"
+            else
+              echo "⚠️  AppImage not found - this may indicate appimagetool issues"
+            fi
+          fi
         else
           echo "[ERROR] Executable not found"
           exit 1
         fi
+        
+    - name: Generate build metadata and checksums
+      run: |
+        python generate_build_metadata.py
+        echo "Generated metadata files:"
+        ls -la dist/*.json dist/*.txt 2>/dev/null || echo "No metadata files generated"
         
     - name: Create release package
       shell: bash
@@ -243,15 +258,39 @@ jobs:
       if: matrix.platform == 'linux'
       run: |
         if [ -f "./dist/mitotic-spindle-tool.AppImage" ]; then
+          echo "✅ AppImage found, uploading to release..."
           gh release upload ${{ needs.create-release.outputs.tag_name }} \
             ./dist/mitotic-spindle-tool.AppImage \
             --clobber
+          echo "✅ AppImage uploaded successfully"
         else
-          echo "AppImage not found, skipping upload"
+          echo "❌ AppImage not found at ./dist/mitotic-spindle-tool.AppImage"
+          echo "📁 Contents of dist directory:"
+          ls -la ./dist/
+          echo "⚠️  AppImage creation may have failed - check build logs"
+          # Don't fail the build, but make the issue visible
         fi
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      continue-on-error: true  # AppImage creation might fail if tools aren't available
+      continue-on-error: true  # Don't fail the entire build if AppImage upload fails
+      
+    - name: Upload build metadata (Linux only)
+      if: matrix.platform == 'linux'
+      run: |
+        # Upload metadata files if they exist
+        if [ -f "./dist/build_metadata.json" ]; then
+          gh release upload ${{ needs.create-release.outputs.tag_name }} \
+            ./dist/build_metadata.json \
+            --clobber
+        fi
+        if [ -f "./dist/CHECKSUMS.txt" ]; then
+          gh release upload ${{ needs.create-release.outputs.tag_name }} \
+            ./dist/CHECKSUMS.txt \
+            --clobber
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -260,4 +299,6 @@ jobs:
         path: |
           dist/${{ matrix.package }}
           dist/mitotic-spindle-tool.AppImage
+          dist/build_metadata.json
+          dist/CHECKSUMS.txt
         retention-days: 90
