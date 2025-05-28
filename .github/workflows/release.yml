@@ -4,11 +4,27 @@ on:
   push:
     tags:
       - 'v*'
+  pull_request:
+    types: [closed]
+    branches:
+      - main
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build release for'
+        required: true
+        default: 'latest'
 
 jobs:
   create-release:
+    # Only run if it's a tag push, manual dispatch, release event, or merged PR to main
+    if: |
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
@@ -20,17 +36,39 @@ jobs:
     - name: Get tag name
       id: get_tag
       run: |
-        if [[ $GITHUB_REF == refs/tags/* ]]; then
-          echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+          if [[ "${{ github.event.inputs.tag }}" == "latest" ]]; then
+            TAG_NAME=$(git describe --tags --abbrev=0)
+          else
+            TAG_NAME="${{ github.event.inputs.tag }}"
+          fi
+        elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          # For PR merges, get the latest tag (which should have been created by auto-release)
+          TAG_NAME=$(git describe --tags --abbrev=0)
+        elif [[ $GITHUB_REF == refs/tags/* ]]; then
+          TAG_NAME=${GITHUB_REF#refs/tags/}
         else
-          echo "tag_name=latest" >> $GITHUB_OUTPUT
+          TAG_NAME=$(git describe --tags --abbrev=0 2>/dev/null || echo "latest")
         fi
+        echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+        echo "Using tag: $TAG_NAME"
         
     - name: Create Release
       id: create_release
       run: |
-        # Create release using GitHub CLI
-        RELEASE_BODY="## Mitotic Spindle Tool ${{ steps.get_tag.outputs.tag_name }}
+        TAG_NAME="${{ steps.get_tag.outputs.tag_name }}"
+        
+        # Check if release already exists
+        if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+          echo "Release $TAG_NAME already exists, will update it"
+          RELEASE_EXISTS=true
+        else
+          echo "Creating new release $TAG_NAME"
+          RELEASE_EXISTS=false
+        fi
+        
+        # Create release body
+        RELEASE_BODY="## Mitotic Spindle Tool $TAG_NAME
         
         ### Downloads
         - **Windows**: \`mitotic-spindle-tool.exe\` (standalone executable)
@@ -50,15 +88,24 @@ jobs:
         ### Requirements
         No additional software installation required - all dependencies are bundled."
         
-        # Create the release and capture the upload URL
-        gh release create ${{ steps.get_tag.outputs.tag_name }} \
-          --title "Release ${{ steps.get_tag.outputs.tag_name }}" \
-          --notes "$RELEASE_BODY" \
-          --draft=false \
-          --prerelease=false
+        if [[ "$RELEASE_EXISTS" == "false" ]]; then
+          # Create the release
+          gh release create "$TAG_NAME" \
+            --title "Release $TAG_NAME" \
+            --notes "$RELEASE_BODY" \
+            --draft=false \
+            --prerelease=false
+        else
+          # Update existing release
+          gh release edit "$TAG_NAME" \
+            --title "Release $TAG_NAME" \
+            --notes "$RELEASE_BODY" \
+            --draft=false \
+            --prerelease=false
+        fi
         
         # Get upload URL for matrix jobs
-        UPLOAD_URL=$(gh api repos/${{ github.repository }}/releases/tags/${{ steps.get_tag.outputs.tag_name }} --jq .upload_url)
+        UPLOAD_URL=$(gh api repos/${{ github.repository }}/releases/tags/$TAG_NAME --jq .upload_url)
         echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
