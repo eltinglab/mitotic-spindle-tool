@@ -811,9 +811,18 @@ class ImageTableModel(QAbstractTableModel):
             if orientation == Qt.Vertical:
                 return str(section + 1)
 
-# create and display the application if this file is being run
-if __name__ == "__main__":
+# main function for entry point
+def main():
+    """Main entry point for the application"""
+    # Support for Windows multiprocessing when packaged with PyInstaller
+    import multiprocessing
+    multiprocessing.freeze_support()
+    
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
+
+# create and display the application if this file is being run
+if __name__ == "__main__":
+    main()

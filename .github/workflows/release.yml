@@ -1,0 +1,213 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      tag_name: ${{ steps.get_tag.outputs.tag_name }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Get tag name
+      id: get_tag
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        else
+          echo "tag_name=latest" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Create Release
+      id: create_release
+      run: |
+        # Create release using GitHub CLI
+        RELEASE_BODY="## Mitotic Spindle Tool ${{ steps.get_tag.outputs.tag_name }}
+        
+        ### Downloads
+        - **Windows**: \`mitotic-spindle-tool.exe\` (standalone executable)
+        - **Linux**: \`mitotic-spindle-tool-linux.tar.gz\` (includes launcher script)
+        - **macOS**: \`mitotic-spindle-tool-macos.dmg\` (disk image)
+        - **Linux AppImage**: \`mitotic-spindle-tool.AppImage\` (portable)
+        
+        ### Installation
+        - **Windows**: Download and run \`mitotic-spindle-tool.exe\` directly
+        - **Linux**: Extract \`mitotic-spindle-tool-linux.tar.gz\` and run \`./run-mitotic-spindle-tool.sh\`
+        - **macOS**: Open \`mitotic-spindle-tool-macos.dmg\` and run the application
+        - **Linux AppImage**: Download and run \`./mitotic-spindle-tool.AppImage\` directly
+        
+        ### Changes
+        See the commit history for detailed changes in this release.
+        
+        ### Requirements
+        No additional software installation required - all dependencies are bundled."
+        
+        # Create the release and capture the upload URL
+        gh release create ${{ steps.get_tag.outputs.tag_name }} \
+          --title "Release ${{ steps.get_tag.outputs.tag_name }}" \
+          --notes "$RELEASE_BODY" \
+          --draft=false \
+          --prerelease=false
+        
+        # Get upload URL for matrix jobs
+        UPLOAD_URL=$(gh api repos/${{ github.repository }}/releases/tags/${{ steps.get_tag.outputs.tag_name }} --jq .upload_url)
+        echo "upload_url=$UPLOAD_URL" >> $GITHUB_OUTPUT
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-release:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            executable: mitotic-spindle-tool
+            package: mitotic-spindle-tool-linux.tar.gz
+          - os: windows-latest
+            platform: windows
+            executable: mitotic-spindle-tool.exe
+            package: mitotic-spindle-tool.exe
+          - os: macos-latest
+            platform: macos
+            executable: mitotic-spindle-tool
+            package: mitotic-spindle-tool-macos.dmg
+            
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+          
+    - name: Install Linux dependencies (Ubuntu only)
+      if: matrix.platform == 'linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget
+        # Install appimagetool for AppImage creation
+        wget -O appimagetool https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool
+        sudo mv appimagetool /usr/local/bin/
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Build executable
+      env:
+        CI: true
+      run: |
+        python build.py
+        
+    - name: Verify build
+      shell: bash
+      run: |
+        if [[ -f "dist/${{ matrix.executable }}" ]]; then
+          echo "[SUCCESS] Executable built successfully"
+          ls -la dist/
+        else
+          echo "[ERROR] Executable not found"
+          exit 1
+        fi
+        
+    - name: Create release package
+      shell: bash
+      run: |
+        cd dist
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          # Windows - no packaging needed, just use the .exe directly
+          echo "Windows executable ready: ${{ matrix.executable }}"
+        elif [[ "${{ matrix.platform }}" == "macos" ]]; then
+          # macOS - create DMG if possible, otherwise tar.gz
+          if command -v hdiutil >/dev/null 2>&1; then
+            mkdir -p dmg_temp
+            cp ${{ matrix.executable }} dmg_temp/
+            cp run-mitotic-spindle-tool.sh dmg_temp/
+            hdiutil create -volname "Mitotic Spindle Tool" \
+              -srcfolder dmg_temp -ov -format UDZO \
+              ${{ matrix.package }} || \
+            tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
+            rm -rf dmg_temp
+          else
+            # Fallback to tar.gz
+            tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }} run-mitotic-spindle-tool.sh
+          fi
+        else
+          # Linux - create tar.gz with executable and launcher
+          tar -czf ${{ matrix.package }} ${{ matrix.executable }} run-mitotic-spindle-tool.sh
+        fi
+        cd ..
+        
+    - name: Upload release asset
+      shell: bash
+      run: |
+        if [[ "${{ matrix.platform }}" == "windows" ]]; then
+          # Windows - upload the .exe directly
+          gh release upload ${{ needs.create-release.outputs.tag_name }} \
+            ./dist/${{ matrix.executable }} \
+            --clobber
+        elif [[ "${{ matrix.platform }}" == "macos" ]]; then
+          # macOS - upload DMG if it exists, otherwise tar.gz
+          if [[ -f "./dist/${{ matrix.package }}" ]]; then
+            gh release upload ${{ needs.create-release.outputs.tag_name }} \
+              ./dist/${{ matrix.package }} \
+              --clobber
+          elif [[ -f "./dist/mitotic-spindle-tool-macos.tar.gz" ]]; then
+            gh release upload ${{ needs.create-release.outputs.tag_name }} \
+              ./dist/mitotic-spindle-tool-macos.tar.gz \
+              --clobber
+          fi
+        else
+          # Linux - upload tar.gz
+          gh release upload ${{ needs.create-release.outputs.tag_name }} \
+            ./dist/${{ matrix.package }} \
+            --clobber
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Upload AppImage (Linux only)
+      if: matrix.platform == 'linux'
+      run: |
+        if [ -f "./dist/mitotic-spindle-tool.AppImage" ]; then
+          gh release upload ${{ needs.create-release.outputs.tag_name }} \
+            ./dist/mitotic-spindle-tool.AppImage \
+            --clobber
+        else
+          echo "AppImage not found, skipping upload"
+        fi
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true  # AppImage creation might fail if tools aren't available
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-${{ matrix.platform }}-${{ needs.create-release.outputs.tag_name }}
+        path: |
+          dist/${{ matrix.package }}
+          dist/mitotic-spindle-tool.AppImage
+        retention-days: 90
