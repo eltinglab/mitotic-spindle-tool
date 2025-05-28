@@ -37,7 +37,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Mitotic Spindle Image Analysis")
         
         # Update the version for new releases
-        versionNumber = "v1.0.2"
+        versionNumber = "v1.0.4"
         
         # keep track of the open file name
         self.fileName = None
