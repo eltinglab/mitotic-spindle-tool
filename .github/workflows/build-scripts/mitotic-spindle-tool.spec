@@ -2,8 +2,8 @@
 
 
 a = Analysis(
-    ['src/spindleGUI.py'],
-    pathex=[],
+    ['../../../src/spindleGUI.py'],
+    pathex=['../../..'],
     binaries=[],
     datas=[],
     hiddenimports=[],
@@ -35,5 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icons/EltingLabSpindle.ico',
+    icon='../../../icons/EltingLabSpindle.ico',
 )

@@ -53,9 +53,10 @@ def generate_metadata(dist_dir="dist"):
     
     # Common artifact patterns
     artifacts = [
-        "mitotic-spindle-tool.exe",
-        "mitotic-spindle-tool",
-        "mitotic-spindle-tool.AppImage",
+        "mitotic-spindle-tool-win.exe",
+        "mitotic-spindle-tool-linux",
+        "mitotic-spindle-tool-macos",
+        "mitotic-spindle-tool-linux.AppImage",
         "mitotic-spindle-tool-linux.tar.gz",
         "mitotic-spindle-tool-macos.tar.gz",
         "mitotic-spindle-tool-macos.dmg",

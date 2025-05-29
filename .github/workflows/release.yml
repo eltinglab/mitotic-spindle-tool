@@ -72,16 +72,16 @@ jobs:
           RELEASE_BODY="## Mitotic Spindle Tool $CURRENT
           
           ### Downloads
-          - **Windows**: \`mitotic-spindle-tool.exe\` (standalone executable)
+          - **Windows**: \`mitotic-spindle-tool-win.exe\` (standalone executable)
           - **Linux (Traditional)**: \`mitotic-spindle-tool-linux.tar.gz\` (includes launcher script)
-          - **Linux (AppImage)**: \`mitotic-spindle-tool.AppImage\` (portable, recommended for Linux)
-          - **macOS**: \`mitotic-spindle-tool-macos.dmg\` (disk image)
+          - **Linux (AppImage)**: \`mitotic-spindle-tool-linux.AppImage\` (portable, recommended for Linux)
+          - **macOS**: \`mitotic-spindle-tool-macos.dmg\` (disk image with app bundle)
           
           ### Installation
-          - **Windows**: Download and run \`mitotic-spindle-tool.exe\` directly
+          - **Windows**: Download and run \`mitotic-spindle-tool-win.exe\` directly
           - **Linux (Traditional)**: Extract \`mitotic-spindle-tool-linux.tar.gz\` and run \`./run-mitotic-spindle-tool.sh\`
-          - **Linux (AppImage)**: Download \`mitotic-spindle-tool.AppImage\`, make executable (\`chmod +x mitotic-spindle-tool.AppImage\`) and run directly
-          - **macOS**: Open \`mitotic-spindle-tool-macos.dmg\` and run the application
+          - **Linux (AppImage)**: Download \`mitotic-spindle-tool-linux.AppImage\`, make executable (\`chmod +x mitotic-spindle-tool-linux.AppImage\`) and run directly
+          - **macOS**: Open \`mitotic-spindle-tool-macos.dmg\` and drag the app to Applications folder
           
           ### Changes
           See the commit history for detailed changes in this release.
@@ -112,15 +112,16 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-            executable: mitotic-spindle-tool
+            executable: mitotic-spindle-tool-linux
             package: mitotic-spindle-tool-linux.tar.gz
+            appimage: mitotic-spindle-tool-linux.AppImage
           - os: windows-latest
             platform: windows
-            executable: mitotic-spindle-tool.exe
-            package: mitotic-spindle-tool.exe
+            executable: mitotic-spindle-tool-win.exe
+            package: mitotic-spindle-tool-win.exe
           - os: macos-latest
             platform: macos
-            executable: mitotic-spindle-tool
+            executable: mitotic-spindle-tool-macos
             package: mitotic-spindle-tool-macos.dmg
             
     runs-on: ${{ matrix.os }}
@@ -163,7 +164,7 @@ jobs:
       env:
         CI: true
       run: |
-        python build.py
+        python .github/workflows/build-scripts/build.py
         
     - name: Verify build
       shell: bash
@@ -173,7 +174,7 @@ jobs:
           ls -la dist/
           
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
-            if [[ -f "dist/mitotic-spindle-tool.AppImage" ]]; then
+            if [[ -f "dist/${{ matrix.appimage }}" ]]; then
               echo "✅ AppImage created successfully"
             fi
           fi
@@ -190,15 +191,30 @@ jobs:
           echo "Windows executable ready: ${{ matrix.executable }}"
         elif [[ "${{ matrix.platform }}" == "macos" ]]; then
           if command -v hdiutil >/dev/null 2>&1; then
-            mkdir -p dmg_temp
-            cp ${{ matrix.executable }} dmg_temp/
-            cp run-mitotic-spindle-tool.sh dmg_temp/ 2>/dev/null || echo "No launcher script found"
-            hdiutil create -volname "Mitotic Spindle Tool" \
-              -srcfolder dmg_temp -ov -format UDZO \
-              ${{ matrix.package }} || \
-            tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }}
-            rm -rf dmg_temp
+            # DMG should already be created by build.py
+            if [[ ! -f "${{ matrix.package }}" ]]; then
+              echo "DMG not found, creating fallback package..."
+              mkdir -p dmg_temp
+              cp ${{ matrix.executable }} dmg_temp/ 2>/dev/null || echo "Executable not found for fallback"
+              cp run-mitotic-spindle-tool.sh dmg_temp/ 2>/dev/null || echo "No launcher script found"
+              hdiutil create -volname "Mitotic Spindle Tool" \
+                -srcfolder dmg_temp -ov -format UDZO \
+                ${{ matrix.package }} || \
+              tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }}
+              rm -rf dmg_temp
+            fi
           else
+            tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }}
+          fi
+        else
+          # Linux packages should already be created by build.py
+          if [[ ! -f "${{ matrix.package }}" ]]; then
+            echo "Package not found, creating fallback..."
+            tar -czf ${{ matrix.package }} ${{ matrix.executable }} run-mitotic-spindle-tool.sh 2>/dev/null || \
+            tar -czf ${{ matrix.package }} ${{ matrix.executable }}
+          fi
+        fi
+        cd ..
             tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }}
           fi
         else
@@ -224,8 +240,8 @@ jobs:
           gh release upload "$TAG_NAME" ./dist/${{ matrix.package }} --clobber
           
           # Upload AppImage if it exists
-          if [[ -f "./dist/mitotic-spindle-tool.AppImage" ]]; then
-            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool.AppImage --clobber
+          if [[ -f "./dist/${{ matrix.appimage }}" ]]; then
+            gh release upload "$TAG_NAME" ./dist/${{ matrix.appimage }} --clobber
           fi
         fi
       env:

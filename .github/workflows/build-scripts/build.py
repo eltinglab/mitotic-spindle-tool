@@ -11,8 +11,13 @@ import subprocess
 import shutil
 from pathlib import Path
 
+# Get the root directory of the project (parent of .github)
+script_dir = Path(__file__).parent
+root_dir = script_dir.parent.parent.parent  # Go up from build-scripts -> workflows -> .github -> root
+os.chdir(root_dir)  # Change to root directory for the build process
+
 # Add src to path to import version
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(root_dir, 'src'))
 from version import __version__, VERSION_DISPLAY
 
 def run_command(cmd, check=True):
@@ -109,15 +114,49 @@ def clean_build_artifacts():
             else:
                 os.remove(path)
 
+
+def get_platform_executable_name():
+    """Get platform-specific executable name"""
+    system = platform.system().lower()
+    if system == "windows":
+        return "mitotic-spindle-tool-win.exe"
+    elif system == "linux":
+        return "mitotic-spindle-tool-linux"
+    elif system == "darwin":
+        return "mitotic-spindle-tool-macos"
+    else:
+        return "mitotic-spindle-tool"
+
+
+def get_platform_package_name():
+    """Get platform-specific package name"""
+    system = platform.system().lower()
+    if system == "windows":
+        return "mitotic-spindle-tool-win.exe"  # Windows doesn't need additional packaging
+    elif system == "linux":
+        return "mitotic-spindle-tool-linux.tar.gz"
+    elif system == "darwin":
+        return "mitotic-spindle-tool-macos.dmg"
+    else:
+        return "mitotic-spindle-tool.tar.gz"
+
+
+def get_platform_appimage_name():
+    """Get platform-specific AppImage name"""
+    return "mitotic-spindle-tool-linux.AppImage"
+
 def build_with_pyinstaller(python_executable):
     """Build executable with PyInstaller"""
     print("Building executable with PyInstaller...")
     
+    # Get the spec file path relative to root directory
+    spec_file = ".github/workflows/build-scripts/mitotic-spindle-tool.spec"
+    
     # Use system python if we couldn't set up venv properly
     if python_executable == sys.executable:
-        cmd = [sys.executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"]
+        cmd = [sys.executable, "-m", "PyInstaller", spec_file]
     else:
-        cmd = [python_executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"]
+        cmd = [python_executable, "-m", "PyInstaller", spec_file]
     
     try:
         # Run PyInstaller
@@ -125,7 +164,7 @@ def build_with_pyinstaller(python_executable):
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] PyInstaller failed with virtual env python: {e}")
         print("Trying with system python...")
-        result = run_command([sys.executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"])
+        result = run_command([sys.executable, "-m", "PyInstaller", spec_file])
     
     system = platform.system().lower()
     if system == "windows":
@@ -134,6 +173,17 @@ def build_with_pyinstaller(python_executable):
         executable_name = "mitotic-spindle-tool"
     
     executable_path = Path("dist") / executable_name
+    
+    # Rename executable with platform suffix for final distribution
+    final_executable_name = get_platform_executable_name()
+    final_executable_path = Path("dist") / final_executable_name
+    
+    if executable_path.exists() and final_executable_name != executable_name:
+        shutil.copy2(executable_path, final_executable_path)
+        print(f"[INFO] Created platform-specific executable: {final_executable_path}")
+        # Keep original for compatibility with other build steps
+    
+    executable_path = final_executable_path if final_executable_path.exists() else executable_path
     
     if executable_path.exists():
         print(f"[SUCCESS] PyInstaller build successful: {executable_path}")
@@ -197,58 +247,60 @@ def create_distribution_package(executable_path, launcher_path):
         return executable_path
         
     elif system == "darwin":
-        # macOS - create branded DMG file
-        package_name = "mitotic-spindle-tool-macos.dmg"
+        # macOS - create proper app bundle and DMG
+        package_name = get_platform_package_name()
         package_path = dist_path / package_name
         
         try:
-            # Try using enhanced DMG creation script first
-            create_dmg_script = Path("create_dmg.py")
-            if create_dmg_script.exists():
-                print("Using enhanced DMG creation...")
-                result = run_command([
-                    sys.executable, str(create_dmg_script), 
-                    str(executable_path), str(package_path)
-                ], check=False)
+            # Create proper macOS .app bundle
+            app_bundle_path = create_macos_app_bundle(executable_path, dist_path)
+            
+            if app_bundle_path:
+                # Create DMG with the app bundle
+                dmg_temp_dir = dist_path / "dmg_temp"
+                dmg_temp_dir.mkdir(exist_ok=True)
                 
-                if result.returncode == 0 and package_path.exists():
-                    print(f"[SUCCESS] Created branded DMG: {package_path}")
-                    return package_path
-                else:
-                    print("[WARNING] Enhanced DMG creation failed, falling back to basic DMG")
-            
-            # Fallback to basic DMG creation
-            dmg_temp_dir = dist_path / "dmg_temp"
-            dmg_temp_dir.mkdir(exist_ok=True)
-            
-            # Copy executable and launcher to temp directory
-            shutil.copy2(executable_path, dmg_temp_dir / executable_path.name)
-            shutil.copy2(launcher_path, dmg_temp_dir / launcher_path.name)
-            
-            # Copy icon for DMG
-            icon_source = Path("icons/EltingLabSpindle_512x512.png")
-            if icon_source.exists():
-                shutil.copy2(icon_source, dmg_temp_dir / "icon.png")
-            
-            # Create basic DMG
-            run_command([
-                "hdiutil", "create", 
-                "-volname", "Mitotic Spindle Tool",
-                "-srcfolder", str(dmg_temp_dir),
-                "-ov", "-format", "UDZO",
-                str(package_path)
-            ])
-            
-            # Clean up temp directory
-            shutil.rmtree(dmg_temp_dir)
-            
-            print(f"[SUCCESS] Created DMG: {package_path}")
-            return package_path
+                # Copy app bundle to temp directory
+                app_name = app_bundle_path.name
+                dmg_app_path = dmg_temp_dir / app_name
+                shutil.copytree(app_bundle_path, dmg_app_path)
+                
+                # Create Applications symlink for easy installation
+                applications_link = dmg_temp_dir / "Applications"
+                if not applications_link.exists():
+                    os.symlink("/Applications", applications_link)
+                
+                # Create background image folder (optional)
+                dmg_bg_dir = dmg_temp_dir / ".background"
+                dmg_bg_dir.mkdir(exist_ok=True)
+                
+                # Copy icon for volume
+                icon_source = Path("icons/EltingLabSpindle_512x512.png")
+                if icon_source.exists():
+                    shutil.copy2(icon_source, dmg_temp_dir / ".VolumeIcon.icns")
+                
+                # Create DMG
+                run_command([
+                    "hdiutil", "create", 
+                    "-volname", "Mitotic Spindle Tool",
+                    "-srcfolder", str(dmg_temp_dir),
+                    "-ov", "-format", "UDZO",
+                    str(package_path)
+                ])
+                
+                # Clean up temp directory
+                shutil.rmtree(dmg_temp_dir)
+                
+                print(f"[SUCCESS] Created DMG with app bundle: {package_path}")
+                return package_path
+            else:
+                print("[WARNING] App bundle creation failed, falling back to basic DMG")
+                raise subprocess.CalledProcessError(1, "app bundle creation")
             
         except subprocess.CalledProcessError as e:
             print(f"[WARNING] DMG creation failed: {e}, falling back to tar.gz")
             # Fallback to tar.gz on macOS if DMG creation fails
-            package_name = "mitotic-spindle-tool-macos.tar.gz"
+            package_name = get_platform_package_name().replace('.dmg', '.tar.gz')
             package_path = dist_path / package_name
             
             import tarfile
@@ -261,7 +313,7 @@ def create_distribution_package(executable_path, launcher_path):
         
     else:
         # Linux - create tar.gz with executable and launcher
-        package_name = "mitotic-spindle-tool-linux.tar.gz"
+        package_name = get_platform_package_name()
         package_path = dist_path / package_name
         
         import tarfile
@@ -271,6 +323,104 @@ def create_distribution_package(executable_path, launcher_path):
         
         print(f"[SUCCESS] Created package: {package_path}")
         return package_path
+
+def create_macos_app_bundle(executable_path, dist_path):
+    """Create a proper macOS .app bundle"""
+    if platform.system().lower() != "darwin":
+        return None
+    
+    app_name = "Mitotic Spindle Tool.app"
+    app_bundle_path = dist_path / app_name
+    
+    print(f"Creating macOS app bundle: {app_bundle_path}")
+    
+    # Create app bundle directory structure
+    contents_dir = app_bundle_path / "Contents"
+    macos_dir = contents_dir / "MacOS"
+    resources_dir = contents_dir / "Resources"
+    
+    # Create directories
+    macos_dir.mkdir(parents=True, exist_ok=True)
+    resources_dir.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        # Copy executable to MacOS directory
+        app_executable = macos_dir / "mitotic-spindle-tool"
+        shutil.copy2(executable_path, app_executable)
+        os.chmod(app_executable, 0o755)
+        
+        # Create Info.plist
+        info_plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>Mitotic Spindle Tool</string>
+    <key>CFBundleExecutable</key>
+    <string>mitotic-spindle-tool</string>
+    <key>CFBundleIconFile</key>
+    <string>EltingLabSpindle</string>
+    <key>CFBundleIdentifier</key>
+    <string>edu.ncsu.physics.mitotic-spindle-tool</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Mitotic Spindle Tool</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>{__version__}</string>
+    <key>CFBundleVersion</key>
+    <string>{__version__}</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>10.15</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSRequiresAquaSystemAppearance</key>
+    <false/>
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeExtensions</key>
+            <array>
+                <string>tiff</string>
+                <string>tif</string>
+            </array>
+            <key>CFBundleTypeName</key>
+            <string>TIFF Image</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+        </dict>
+    </array>
+</dict>
+</plist>"""
+        
+        with open(contents_dir / "Info.plist", 'w') as f:
+            f.write(info_plist_content)
+        
+        # Copy icon if available (convert PNG to ICNS if needed)
+        icon_source = Path("icons/EltingLabSpindle.ico")
+        if icon_source.exists():
+            icon_dest = resources_dir / "EltingLabSpindle.icns"
+            shutil.copy2(icon_source, icon_dest)
+        else:
+            # Try PNG icons
+            for size in [512, 256, 128, 64, 32, 16]:
+                png_icon = Path(f"icons/EltingLabSpindle_{size}x{size}.png")
+                if png_icon.exists():
+                    # For simplicity, just copy the largest PNG as icns
+                    icon_dest = resources_dir / "EltingLabSpindle.icns"
+                    shutil.copy2(png_icon, icon_dest)
+                    break
+        
+        print(f"[SUCCESS] Created macOS app bundle: {app_bundle_path}")
+        return app_bundle_path
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to create app bundle: {e}")
+        if app_bundle_path.exists():
+            shutil.rmtree(app_bundle_path)
+        return None
 
 def create_appimage():
     """Create AppImage for Linux (if tools are available)"""
@@ -388,8 +538,9 @@ exec "${HERE}/usr/bin/mitotic-spindle-tool" "$@"
         
         # Run appimagetool with more verbose output and error handling
         print("Running appimagetool...")
+        appimage_name = get_platform_appimage_name()
         result = subprocess.run(
-            ["appimagetool", "--verbose", "AppDir", "mitotic-spindle-tool.AppImage"], 
+            ["appimagetool", "--verbose", "AppDir", appimage_name], 
             env=env, 
             check=False, 
             capture_output=True, 
@@ -406,7 +557,7 @@ exec "${HERE}/usr/bin/mitotic-spindle-tool" "$@"
         
         os.chdir(current_dir)
         
-        appimage_path = Path("dist/mitotic-spindle-tool.AppImage")
+        appimage_path = Path("dist") / appimage_name
         if result.returncode == 0 and appimage_path.exists():
             os.chmod(appimage_path, 0o755)
             print(f"[SUCCESS] Created AppImage: {appimage_path}")

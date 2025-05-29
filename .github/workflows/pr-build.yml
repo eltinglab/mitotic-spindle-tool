@@ -7,10 +7,7 @@ on:
     paths:
       - 'src/**'
       - 'requirements.txt'
-      - 'build.py'
-      - 'build-linux.sh'
-      - 'build-windows.bat'
-      - 'mitotic-spindle-tool.spec'
+      - '.github/workflows/build-scripts/**'
       - 'pyproject.toml'
       - 'setup.py'
       - '.github/workflows/pr-build.yml'
@@ -98,7 +95,7 @@ jobs:
       env:
         CI: true
       run: |
-        python build.py
+        python .github/workflows/build-scripts/build.py
         
     - name: Verify build and collect info
       shell: bash
