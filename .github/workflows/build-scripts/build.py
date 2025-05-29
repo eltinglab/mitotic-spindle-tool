@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Cross-platform build script for Mitotic Spindle Tool
 Supports Windows, Linux, and macOS
@@ -12,6 +13,16 @@ import shutil
 import tarfile
 from pathlib import Path
 
+# Ensure UTF-8 encoding for Windows compatibility
+if platform.system() == "Windows":
+    # Set console encoding to UTF-8 if possible
+    try:
+        import codecs
+        sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+        sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+    except:
+        pass  # Fall back to default encoding
+
 # Get the root directory of the project (parent of .github)
 script_dir = Path(__file__).parent
 root_dir = script_dir.parent.parent.parent  # Go up from build-scripts -> workflows -> .github -> root
@@ -24,10 +35,14 @@ from version import __version__, VERSION_DISPLAY
 def run_command(cmd, check=True, capture_output=True):
     """Run a command and return the result"""
     print(f"Running: {cmd}")
+    # Ensure UTF-8 encoding for subprocess on Windows
+    encoding = 'utf-8' if platform.system() == "Windows" else None
     if isinstance(cmd, str):
-        result = subprocess.run(cmd, shell=True, check=check, capture_output=capture_output, text=True)
+        result = subprocess.run(cmd, shell=True, check=check, capture_output=capture_output, 
+                              text=True, encoding=encoding, errors='replace')
     else:
-        result = subprocess.run(cmd, check=check, capture_output=capture_output, text=True)
+        result = subprocess.run(cmd, check=check, capture_output=capture_output, 
+                              text=True, encoding=encoding, errors='replace')
     
     if capture_output:
         if result.stdout:
@@ -44,6 +59,8 @@ def setup_virtual_environment():
     # Check if we're in CI environment - skip venv and use system Python
     if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
         print("CI environment detected, using system Python...")
+        # Ensure PYTHONPATH is set for CI builds too
+        os.environ["PYTHONPATH"] = os.path.join(root_dir, "src")
         return "pip", sys.executable
     
     # For local builds, emulate CI environment to ensure consistent module handling
@@ -187,9 +204,9 @@ def build_with_pyinstaller(python_executable):
     for module in src_modules:
         module_path = os.path.join('src', module)
         if os.path.exists(module_path):
-            print(f"[INFO] ✓ Found module: {module}")
+            print(f"[INFO] [OK] Found module: {module}")
         else:
-            print(f"[WARNING] ✗ Missing module: {module}")
+            print(f"[WARNING] [X] Missing module: {module}")
     
     # Set up environment for PyInstaller to find modules properly
     env = os.environ.copy()
@@ -204,7 +221,10 @@ def build_with_pyinstaller(python_executable):
     try:
         # Run PyInstaller with output capture and custom environment
         print(f"[INFO] Running PyInstaller with PYTHONPATH: {env['PYTHONPATH']}")
-        result = subprocess.run(cmd, check=False, capture_output=True, text=True, env=env)
+        # Ensure UTF-8 encoding for subprocess on Windows
+        encoding = 'utf-8' if platform.system() == "Windows" else None
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True, env=env,
+                              encoding=encoding, errors='replace')
         if result.returncode != 0:
             print(f"[ERROR] PyInstaller failed with return code {result.returncode}")
             print("STDOUT:", result.stdout)
@@ -219,7 +239,10 @@ def build_with_pyinstaller(python_executable):
         print("Trying with system python...")
         try:
             cmd_fallback = [sys.executable, "-m", "PyInstaller", spec_file]
-            result = subprocess.run(cmd_fallback, check=False, capture_output=True, text=True, env=env)
+            # Ensure UTF-8 encoding for subprocess on Windows
+            encoding = 'utf-8' if platform.system() == "Windows" else None
+            result = subprocess.run(cmd_fallback, check=False, capture_output=True, text=True, env=env,
+                                  encoding=encoding, errors='replace')
             if result.returncode != 0:
                 print(f"[ERROR] PyInstaller failed with system python too, return code {result.returncode}")
                 print("STDOUT:", result.stdout)

@@ -324,7 +324,7 @@ class MainWindow(QMainWindow):
                     self.setWindowIcon(icon)
                     # Also set the application icon globally
                     QApplication.instance().setWindowIcon(icon)
-                    print(f"✅ Application icon set successfully: {icon_path}")
+                    print(f"[SUCCESS] Application icon set successfully: {icon_path}")
                     return
             
             print("⚠️ Warning: Could not find application icon file")
