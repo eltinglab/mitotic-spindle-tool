@@ -17,10 +17,22 @@ import os
 import re
 from pathlib import Path
 
+# Get the root directory of the project (parent of .github)
+script_dir = Path(__file__).parent
+root_dir = script_dir.parent.parent.parent  # Go up from build-scripts -> workflows -> .github -> root
+
 def get_current_version():
     """Get current version from version.py"""
-    version_file = Path("../../src/version.py")
+    version_file = root_dir / "src" / "version.py"
+    
+    # Debug: Print path information
+    print(f"[DEBUG] Script location: {Path(__file__).absolute()}")
+    print(f"[DEBUG] Root directory: {root_dir.absolute()}")
+    print(f"[DEBUG] Version file path: {version_file.absolute()}")
+    print(f"[DEBUG] Version file exists: {version_file.exists()}")
+    
     if not version_file.exists():
+        print(f"[WARNING] Version file not found at {version_file}")
         return "1.0.0"
     
     with open(version_file, 'r') as f:
@@ -28,8 +40,11 @@ def get_current_version():
     
     match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
     if match:
-        return match.group(1)
+        found_version = match.group(1)
+        print(f"[DEBUG] Found version in file: {found_version}")
+        return found_version
     
+    print(f"[WARNING] Could not parse version from {version_file}")
     return "1.0.0"
 
 def bump_version(current_version, bump_type):
@@ -52,7 +67,7 @@ def bump_version(current_version, bump_type):
 
 def update_version_file(new_version):
     """Update the central version.py file"""
-    version_file = Path("src/version.py")
+    version_file = root_dir / "src" / "version.py"
     
     content = f'''"""
 Version information for Mitotic Spindle Tool
@@ -75,7 +90,7 @@ version = __version__'''
 
 def update_pyproject_toml(new_version):
     """Update pyproject.toml for compatibility"""
-    pyproject_file = Path("../../pyproject.toml")
+    pyproject_file = root_dir / "pyproject.toml"
     
     if not pyproject_file.exists():
         return
@@ -113,7 +128,7 @@ def main():
         
         bump_type = sys.argv[2]
         new_version = bump_version(current_version, bump_type)
-        print(f"Bumping {bump_type} version: {current_version} → {new_version}")
+        print(f"Bumping {bump_type} version: {current_version} -> {new_version}")
         
     else:
         new_version = sys.argv[1]
@@ -122,13 +137,13 @@ def main():
             print(f"Error: Invalid version format '{new_version}'. Use semantic versioning (e.g., 1.2.3)")
             return 1
         
-        print(f"Setting version: {current_version} → {new_version}")
+        print(f"Setting version: {current_version} -> {new_version}")
     
     # Update files
     update_version_file(new_version)
     update_pyproject_toml(new_version)
     
-    print(f"✅ Version updated to {new_version}")
+    print(f"[SUCCESS] Version updated to {new_version}")
     print("Files updated:")
     print("  - src/version.py")
     print("  - pyproject.toml")
