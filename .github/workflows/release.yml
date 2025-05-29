@@ -164,22 +164,58 @@ jobs:
       env:
         CI: true
       run: |
+        echo "🏗️ Starting build process..."
+        echo "Platform: ${{ matrix.platform }}"
+        echo "Expected executable: ${{ matrix.executable }}"
         python .github/workflows/build-scripts/build.py
+        echo "🔍 Build completed, checking dist/ contents:"
+        ls -la dist/ || echo "dist/ directory not found"
         
     - name: Verify build
       shell: bash
       run: |
+        echo "🔍 Checking for built executables..."
+        echo "Expected executable: ${{ matrix.executable }}"
+        ls -la dist/
+        
+        # Check for platform-specific executable first, then base executable
         if [[ -f "dist/${{ matrix.executable }}" ]]; then
-          echo "✅ Executable built successfully"
-          ls -la dist/
+          echo "✅ Platform-specific executable found: ${{ matrix.executable }}"
+        elif [[ "${{ matrix.platform }}" == "macos" && -f "dist/mitotic-spindle-tool" ]]; then
+          echo "✅ Base executable found for macOS: mitotic-spindle-tool"
+          # Copy to expected name for consistency
+          cp "dist/mitotic-spindle-tool" "dist/${{ matrix.executable }}"
+          echo "✅ Copied to platform-specific name: ${{ matrix.executable }}"
+        elif [[ "${{ matrix.platform }}" == "linux" && -f "dist/mitotic-spindle-tool" ]]; then
+          echo "✅ Base executable found for Linux: mitotic-spindle-tool"
+          # Copy to expected name for consistency
+          cp "dist/mitotic-spindle-tool" "dist/${{ matrix.executable }}"
+          echo "✅ Copied to platform-specific name: ${{ matrix.executable }}"
+        elif [[ "${{ matrix.platform }}" == "windows" && -f "dist/mitotic-spindle-tool.exe" ]]; then
+          echo "✅ Base executable found for Windows: mitotic-spindle-tool.exe"
+          # Copy to expected name for consistency
+          cp "dist/mitotic-spindle-tool.exe" "dist/${{ matrix.executable }}"
+          echo "✅ Copied to platform-specific name: ${{ matrix.executable }}"
+        else
+          echo "❌ No executable found"
+          echo "Looking for: dist/${{ matrix.executable }}"
+          echo "Also checked for base executable variants"
+          exit 1
+        fi
+        
+        # Verify final executable exists
+        if [[ -f "dist/${{ matrix.executable }}" ]]; then
+          echo "✅ Final executable verified: ${{ matrix.executable }}"
           
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             if [[ -f "dist/${{ matrix.appimage }}" ]]; then
               echo "✅ AppImage created successfully"
+            else
+              echo "ℹ️ AppImage not found (may be expected)"
             fi
           fi
         else
-          echo "❌ Executable not found"
+          echo "❌ Final verification failed"
           exit 1
         fi
         
@@ -213,13 +249,6 @@ jobs:
             tar -czf ${{ matrix.package }} ${{ matrix.executable }} run-mitotic-spindle-tool.sh 2>/dev/null || \
             tar -czf ${{ matrix.package }} ${{ matrix.executable }}
           fi
-        fi
-        cd ..
-            tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }}
-          fi
-        else
-          tar -czf ${{ matrix.package }} ${{ matrix.executable }} run-mitotic-spindle-tool.sh 2>/dev/null || \
-          tar -czf ${{ matrix.package }} ${{ matrix.executable }}
         fi
         cd ..
         
