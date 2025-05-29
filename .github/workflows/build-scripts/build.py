@@ -11,8 +11,13 @@ import subprocess
 import shutil
 from pathlib import Path
 
+# Get the root directory of the project (parent of .github)
+script_dir = Path(__file__).parent
+root_dir = script_dir.parent.parent.parent  # Go up from build-scripts -> workflows -> .github -> root
+os.chdir(root_dir)  # Change to root directory for the build process
+
 # Add src to path to import version
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(root_dir, 'src'))
 from version import __version__, VERSION_DISPLAY
 
 def run_command(cmd, check=True):
@@ -144,11 +149,14 @@ def build_with_pyinstaller(python_executable):
     """Build executable with PyInstaller"""
     print("Building executable with PyInstaller...")
     
+    # Get the spec file path relative to root directory
+    spec_file = ".github/workflows/build-scripts/mitotic-spindle-tool.spec"
+    
     # Use system python if we couldn't set up venv properly
     if python_executable == sys.executable:
-        cmd = [sys.executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"]
+        cmd = [sys.executable, "-m", "PyInstaller", spec_file]
     else:
-        cmd = [python_executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"]
+        cmd = [python_executable, "-m", "PyInstaller", spec_file]
     
     try:
         # Run PyInstaller
@@ -156,7 +164,7 @@ def build_with_pyinstaller(python_executable):
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] PyInstaller failed with virtual env python: {e}")
         print("Trying with system python...")
-        result = run_command([sys.executable, "-m", "PyInstaller", "mitotic-spindle-tool.spec"])
+        result = run_command([sys.executable, "-m", "PyInstaller", spec_file])
     
     system = platform.system().lower()
     if system == "windows":
@@ -390,19 +398,75 @@ def create_macos_app_bundle(executable_path, dist_path):
         with open(contents_dir / "Info.plist", 'w') as f:
             f.write(info_plist_content)
         
-        # Copy icon if available (convert PNG to ICNS if needed)
-        icon_source = Path("icons/EltingLabSpindle.ico")
-        if icon_source.exists():
-            icon_dest = resources_dir / "EltingLabSpindle.icns"
-            shutil.copy2(icon_source, icon_dest)
-        else:
-            # Try PNG icons
+        # Create proper ICNS file for macOS from PNG icons
+        icon_dest = resources_dir / "EltingLabSpindle.icns"
+        icns_created = False
+        
+        # Try to create ICNS using iconutil (macOS built-in tool)
+        if shutil.which("iconutil"):
+            iconset_dir = resources_dir / "EltingLabSpindle.iconset"
+            iconset_dir.mkdir(exist_ok=True)
+            
+            # Copy PNG files to iconset with proper naming
+            icon_mappings = {
+                "16x16": ["icon_16x16.png"],
+                "32x32": ["icon_16x16@2x.png", "icon_32x32.png"],
+                "64x64": ["icon_32x32@2x.png"],
+                "128x128": ["icon_64x64@2x.png", "icon_128x128.png"],
+                "256x256": ["icon_128x128@2x.png", "icon_256x256.png"],
+                "512x512": ["icon_256x256@2x.png", "icon_512x512.png"],
+            }
+            
+            iconset_files_created = 0
+            for size, iconset_names in icon_mappings.items():
+                png_source = Path(f"icons/EltingLabSpindle_{size}.png")
+                if png_source.exists():
+                    for iconset_name in iconset_names:
+                        iconset_dest = iconset_dir / iconset_name
+                        shutil.copy2(png_source, iconset_dest)
+                        iconset_files_created += 1
+            
+            if iconset_files_created > 0:
+                # Generate ICNS file
+                try:
+                    result = run_command([
+                        "iconutil", "-c", "icns", 
+                        str(iconset_dir), 
+                        "-o", str(icon_dest)
+                    ], check=False)
+                    if result.returncode == 0 and icon_dest.exists():
+                        icns_created = True
+                        print(f"[SUCCESS] Created ICNS file using iconutil: {icon_dest}")
+                    # Clean up iconset directory
+                    shutil.rmtree(iconset_dir)
+                except subprocess.CalledProcessError:
+                    shutil.rmtree(iconset_dir)
+        
+        # Fallback: try using ImageMagick to convert PNG to ICNS
+        if not icns_created and (shutil.which("magick") or shutil.which("convert")):
+            png_files = []
+            for size in [16, 32, 64, 128, 256, 512]:
+                png_file = Path(f"icons/EltingLabSpindle_{size}x{size}.png")
+                if png_file.exists():
+                    png_files.append(str(png_file))
+            
+            if png_files:
+                try:
+                    magick_cmd = "magick" if shutil.which("magick") else "convert"
+                    result = run_command([magick_cmd] + png_files + [str(icon_dest)], check=False)
+                    if result.returncode == 0 and icon_dest.exists():
+                        icns_created = True
+                        print(f"[SUCCESS] Created ICNS file using {magick_cmd}: {icon_dest}")
+                except subprocess.CalledProcessError:
+                    pass
+        
+        # Final fallback: copy the largest PNG as icns (not ideal but works)
+        if not icns_created:
             for size in [512, 256, 128, 64, 32, 16]:
                 png_icon = Path(f"icons/EltingLabSpindle_{size}x{size}.png")
                 if png_icon.exists():
-                    # For simplicity, just copy the largest PNG as icns
-                    icon_dest = resources_dir / "EltingLabSpindle.icns"
                     shutil.copy2(png_icon, icon_dest)
+                    print(f"[WARNING] Copied PNG as ICNS (fallback): {png_icon.name}")
                     break
         
         print(f"[SUCCESS] Created macOS app bundle: {app_bundle_path}")
@@ -564,30 +628,39 @@ exec "${HERE}/usr/bin/mitotic-spindle-tool" "$@"
         return None
 
 def prepare_icons():
-    """Prepare icons for the build process - use the high-resolution .ico file we created"""
+    """Prepare and verify icons for the build process"""
     print("Preparing icons for build...")
     
     icons_dir = Path("icons")
     if not icons_dir.exists():
-        print("[WARNING] Icons directory not found")
-        return {}
+        print("[WARNING] Icons directory not found, creating...")
+        icons_dir.mkdir(exist_ok=True)
+        return False
     
-    # Use the high-resolution .ico file we created
+    # Icon files we need for different platforms
+    required_icons = {
+        "ico": "EltingLabSpindle.ico",  # High-res multi-size .ico for Windows
+        "png_512": "EltingLabSpindle_512x512.png",  # High-res for macOS DMG and Linux
+        "png_256": "EltingLabSpindle_256x256.png",  # Medium res for Linux AppImage
+        "png_128": "EltingLabSpindle_128x128.png",  # For various desktop integrations
+        "png_64": "EltingLabSpindle_64x64.png",
+        "png_48": "EltingLabSpindle_48x48.png",
+        "png_32": "EltingLabSpindle_32x32.png",
+        "png_16": "EltingLabSpindle_16x16.png"
+    }
+    
     icons_available = {}
+    for icon_type, filename in required_icons.items():
+        icon_path = icons_dir / filename
+        if icon_path.exists():
+            icons_available[icon_type] = icon_path
+            print(f"[SUCCESS] Found {icon_type} icon: {filename}")
     
-    # Main icon file (high-resolution multi-size .ico)
-    ico_path = icons_dir / "EltingLabSpindle.ico"
-    if ico_path.exists():
-        icons_available["ico"] = ico_path
-        print(f"[SUCCESS] Using high-resolution icon: {ico_path.name}")
-    
-    # PNG icons for various platforms
-    png_sizes = ["512x512", "256x256", "128x128", "64x64", "48x48", "32x32", "16x16"]
-    for size in png_sizes:
-        png_path = icons_dir / f"EltingLabSpindle_{size}.png"
-        if png_path.exists():
-            icons_available[f"png_{size}"] = png_path
-            print(f"[SUCCESS] Found PNG icon: {png_path.name}")
+    # Ensure we have the essential icons
+    if "ico" in icons_available:
+        print(f"[SUCCESS] High-resolution Windows icon ready: {icons_available['ico'].name}")
+    if "png_512" in icons_available:
+        print(f"[SUCCESS] High-resolution macOS/Linux icon ready: {icons_available['png_512'].name}")
     
     return icons_available
 

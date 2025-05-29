@@ -7,10 +7,7 @@ on:
     paths:
       - 'src/**'
       - 'requirements.txt'
-      - 'build.py'
-      - 'build-linux.sh'
-      - 'build-windows.bat'
-      - 'mitotic-spindle-tool.spec'
+      - '.github/workflows/build-scripts/**'
       - 'pyproject.toml'
       - 'setup.py'
       - '.github/workflows/pr-build.yml'
@@ -98,7 +95,7 @@ jobs:
       env:
         CI: true
       run: |
-        python build.py
+        python .github/workflows/build-scripts/build.py
         
     - name: Verify build and collect info
       shell: bash
@@ -127,14 +124,14 @@ jobs:
           # Check for AppImage on Linux
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             echo "" >> build_report.md
-            if [[ -f "dist/mitotic-spindle-tool.AppImage" ]]; then
+            if [[ -f "dist/mitotic-spindle-tool-linux.AppImage" ]]; then
               echo "**[SUCCESS]** **AppImage created successfully** 📦" >> build_report.md
-              APPIMAGE_SIZE=$(stat -c%s "dist/mitotic-spindle-tool.AppImage")
+              APPIMAGE_SIZE=$(stat -c%s "dist/mitotic-spindle-tool-linux.AppImage")
               APPIMAGE_SIZE_MB=$(python3 -c "print(f'{$APPIMAGE_SIZE / 1024 / 1024:.2f}')")
               echo "**AppImage Size**: ${APPIMAGE_SIZE_MB} MB" >> build_report.md
               
               # Verify AppImage is executable
-              if [[ -x "dist/mitotic-spindle-tool.AppImage" ]]; then
+              if [[ -x "dist/mitotic-spindle-tool-linux.AppImage" ]]; then
                 echo "**AppImage Status**: ✅ Executable and ready for distribution" >> build_report.md
               else
                 echo "**AppImage Status**: ⚠️ Created but not executable" >> build_report.md
@@ -202,7 +199,7 @@ jobs:
           dist/mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.*
           dist/mitotic-spindle-tool-${{ matrix.platform }}.tar.gz
           dist/mitotic-spindle-tool-${{ matrix.platform }}.dmg
-          dist/mitotic-spindle-tool.AppImage
+          dist/mitotic-spindle-tool-linux.AppImage
           build_report.md
         retention-days: 30
         
@@ -218,6 +215,47 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for git tags
+        
+    - name: Check version information
+      id: version-check
+      run: |
+        # Extract current version from version.py
+        CURRENT_VERSION=$(python -c "
+        import sys
+        sys.path.append('src')
+        from version import __version__
+        print(__version__)
+        ")
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+        # Get latest git tag
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+        echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+        
+        # Check if current version tag already exists
+        TAG_EXISTS="false"
+        if git rev-parse "v$CURRENT_VERSION" >/dev/null 2>&1; then
+          TAG_EXISTS="true"
+        fi
+        echo "tag_exists=$TAG_EXISTS" >> $GITHUB_OUTPUT
+        
+        # Determine if this would be a new release
+        NEW_RELEASE="false"
+        if [[ "$LATEST_TAG" != "v$CURRENT_VERSION" && "$TAG_EXISTS" == "false" ]]; then
+          NEW_RELEASE="true"
+        fi
+        echo "new_release=$NEW_RELEASE" >> $GITHUB_OUTPUT
+        
+        echo "Version check complete:"
+        echo "  Current version: $CURRENT_VERSION"
+        echo "  Latest tag: $LATEST_TAG"
+        echo "  Tag exists: $TAG_EXISTS"
+        echo "  Would create new release: $NEW_RELEASE"
+        
     - name: Download build reports
       uses: actions/download-artifact@v4
       with:
@@ -235,11 +273,31 @@ jobs:
           const artifactsUrl = `https://github.com/${repo.owner}/${repo.repo}/actions/runs/${runId}`;
           const commit = context.payload.pull_request.head.sha.slice(0, 7);
           
-          // Collect all build reports
+          // Version information
+          const currentVersion = '${{ steps.version-check.outputs.current_version }}';
+          const latestTag = '${{ steps.version-check.outputs.latest_tag }}';
+          const tagExists = '${{ steps.version-check.outputs.tag_exists }}' === 'true';
+          const newRelease = '${{ steps.version-check.outputs.new_release }}' === 'true';
+          
           let comment = `## 🛠️ Build Results for PR #${{ needs.pr-info.outputs.pr_number }}\n\n`;
           comment += `**PR Title**: ${{ needs.pr-info.outputs.pr_title }}\n`;
           comment += `**Commit**: \`${commit}\`\n\n`;
           
+          // Add version information section
+          comment += `## 📋 Version Information\n`;
+          comment += `**Current Version**: \`v${currentVersion}\`\n`;
+          comment += `**Latest Git Tag**: \`${latestTag}\`\n`;
+          
+          if (newRelease) {
+            comment += `**🚀 This PR would create a new release**: \`v${currentVersion}\`\n`;
+          } else if (tagExists) {
+            comment += `**⚠️ Warning**: Tag \`v${currentVersion}\` already exists!\n`;
+          } else if (latestTag === `v${currentVersion}`) {
+            comment += `**ℹ️ Note**: Version matches latest tag (no version bump)\n`;
+          }
+          comment += `\n`;
+          
+          // Collect all build reports
           const platforms = ['linux', 'windows', 'macos'];
           let allBuildsSuccessful = true;
           let artifactNames = [];
@@ -264,6 +322,9 @@ jobs:
           
           if (allBuildsSuccessful) {
             comment += `## ✅ Summary\nAll builds completed successfully!\n\n`;
+            if (newRelease) {
+              comment += `🎯 **Ready for release**: This PR creates version \`v${currentVersion}\`\n\n`;
+            }
             comment += `🛠️ **Download build artifacts [here](${artifactsUrl})** from the workflow run.\n\n`;
             comment += `**Available artifacts**:\n`;
             for (const artifact of artifactNames) {
