@@ -13,6 +13,7 @@ import curveFitData as cFD
 import plotSpindle as pS
 import plotDialog as pD
 import manualSpindleDialog as mSD
+import metadataDialog as mdD
 from version import VERSION_DISPLAY
 import os
 from numpy import zeros, arange
@@ -66,6 +67,8 @@ class MainWindow(QMainWindow):
         # create accessible widgets
         self.importLabel = QLabel("Single Z")
         self.tiffButton = QPushButton(".tiff")
+        self.metadataButton = QPushButton("Metadata Info")
+        self.metadataButton.setEnabled(False)  # Initially disabled until TIFF is loaded
 
         self.totalFrameLabel = QLabel("# of Frames")
         self.totalFrameValue = QLabel("0")
@@ -194,6 +197,7 @@ class MainWindow(QMainWindow):
         tempVertical.addWidget(importTitle)
         tempGrid.addWidget(self.importLabel, 0, 0)
         tempGrid.addWidget(self.tiffButton, 0, 1)
+        tempGrid.addWidget(self.metadataButton, 1, 0, 1, 2)  # Span across both columns
         importWidget.setLayout(tempGrid)
         tempGrid = QGridLayout()
         tempVertical.addWidget(importWidget)
@@ -269,6 +273,7 @@ class MainWindow(QMainWindow):
 
         # set fixed button sizes
         self.tiffButton.setFixedSize(defaultSize)
+        self.metadataButton.setFixedSize(defaultSize)
         self.previewButton.setFixedSize(defaultSize)
         self.manualButton.setFixedSize(defaultSize)
         self.addButton.setFixedSize(defaultSize)
@@ -278,6 +283,7 @@ class MainWindow(QMainWindow):
 
         # connect signals to slots
         self.tiffButton.clicked.connect(self.onInputTiffClicked)
+        self.metadataButton.clicked.connect(self.onMetadataClicked)
 
         self.frameValue.textChanged.connect(self.onFrameUpdate)
         self.threshValue.textChanged.connect(self.applyThreshold)
@@ -319,6 +325,9 @@ class MainWindow(QMainWindow):
             self.frameValue.setMaximum(numFrames)
             self.totalFrameValue.setText(str(numFrames))
             
+            # Enable metadata button now that a TIFF is loaded
+            self.metadataButton.setEnabled(True)
+            
             # create the data array and place it in the QTableView
             self.dataTableArray = zeros((numFrames, len(cFD.DATA_NAMES)))
             self.dataTableModel = (
@@ -334,6 +343,18 @@ class MainWindow(QMainWindow):
             self.threshValue.setValue(1000)
             self.gOLIterationsValue.setValue(1)
             self.gOLFactorValue.setValue(4)
+
+    # handle metadata info button press
+    def onMetadataClicked(self):
+        """Show metadata information for the currently loaded TIFF file"""
+        if self.fileName:
+            try:
+                # Create and show the metadata dialog
+                metadata_dialog = mdD.MetadataDialog(self.fileName, self)
+                metadata_dialog.exec()
+            except Exception as e:
+                # Handle any errors in creating the dialog
+                self.statusBar().showMessage(f"Error displaying metadata: {str(e)}", 5000)
 
     # handle update of the frame number scroller
     def onFrameUpdate(self):
