@@ -46,6 +46,11 @@ def setup_virtual_environment():
         print("CI environment detected, using system Python...")
         return "pip", sys.executable
     
+    # For local builds, emulate CI environment to ensure consistent module handling
+    print("Local build detected, emulating CI environment...")
+    os.environ["CI"] = "true"
+    os.environ["PYTHONPATH"] = os.path.join(root_dir, "src")
+    
     venv_path = Path("venv")
     if not venv_path.exists():
         print("Creating virtual environment...")
@@ -171,6 +176,24 @@ def build_with_pyinstaller(python_executable):
     print(f"[INFO] Spec file path: {os.path.abspath(spec_file)}")
     print(f"[INFO] Main script path: {os.path.abspath('src/spindleGUI.py')}")
     print(f"[INFO] Icon path: {os.path.abspath('icons/EltingLabSpindle.ico')}")
+    print(f"[INFO] Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
+    
+    # Verify all required modules exist
+    src_modules = ['metadataDialog.py', 'manualSpindleDialog.py', 'plotDialog.py', 
+                   'plotSpindle.py', 'curveFitData.py', 'threshFunctions.py', 
+                   'tiffFunctions.py', 'version.py', 'keypress_method.py', 
+                   'spindlePreviewDialog.py']
+    
+    for module in src_modules:
+        module_path = os.path.join('src', module)
+        if os.path.exists(module_path):
+            print(f"[INFO] ✓ Found module: {module}")
+        else:
+            print(f"[WARNING] ✗ Missing module: {module}")
+    
+    # Set up environment for PyInstaller to find modules properly
+    env = os.environ.copy()
+    env['PYTHONPATH'] = os.path.join(root_dir, 'src')
     
     # Use system python if we couldn't set up venv properly
     if python_executable == sys.executable:
@@ -179,24 +202,34 @@ def build_with_pyinstaller(python_executable):
         cmd = [python_executable, "-m", "PyInstaller", spec_file]
     
     try:
-        # Run PyInstaller with output capture to see error details
-        result = run_command(cmd, check=False)
+        # Run PyInstaller with output capture and custom environment
+        print(f"[INFO] Running PyInstaller with PYTHONPATH: {env['PYTHONPATH']}")
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True, env=env)
         if result.returncode != 0:
             print(f"[ERROR] PyInstaller failed with return code {result.returncode}")
             print("STDOUT:", result.stdout)
             print("STDERR:", result.stderr)
             raise subprocess.CalledProcessError(result.returncode, cmd)
+        else:
+            print("STDOUT:", result.stdout)
+            if result.stderr:
+                print("STDERR:", result.stderr)
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] PyInstaller failed with virtual env python: {e}")
         print("Trying with system python...")
         try:
-            result = run_command([sys.executable, "-m", "PyInstaller", spec_file], check=False)
+            cmd_fallback = [sys.executable, "-m", "PyInstaller", spec_file]
+            result = subprocess.run(cmd_fallback, check=False, capture_output=True, text=True, env=env)
             if result.returncode != 0:
                 print(f"[ERROR] PyInstaller failed with system python too, return code {result.returncode}")
                 print("STDOUT:", result.stdout)
                 print("STDERR:", result.stderr)
-                print(f"Build failed with error: Command '{[sys.executable, '-m', 'PyInstaller', spec_file]}' returned non-zero exit status {result.returncode}.")
+                print(f"Build failed with error: Command '{cmd_fallback}' returned non-zero exit status {result.returncode}.")
                 sys.exit(1)
+            else:
+                print("STDOUT:", result.stdout)
+                if result.stderr:
+                    print("STDERR:", result.stderr)
         except subprocess.CalledProcessError as e2:
             print(f"Build failed with error: {e2}")
             sys.exit(1)
