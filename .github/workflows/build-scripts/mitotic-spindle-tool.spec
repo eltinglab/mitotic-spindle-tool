@@ -3,7 +3,7 @@
 
 a = Analysis(
     ['../../../src/spindleGUI.py'],
-    pathex=['../../..'],
+    pathex=['../../../src', '../../..'],
     binaries=[],
     datas=[],
     hiddenimports=[
