@@ -9,6 +9,7 @@ import sys
 import platform
 import subprocess
 import shutil
+import tarfile
 from pathlib import Path
 
 # Get the root directory of the project (parent of .github)
@@ -178,12 +179,27 @@ def build_with_pyinstaller(python_executable):
         cmd = [python_executable, "-m", "PyInstaller", spec_file]
     
     try:
-        # Run PyInstaller without capturing output to see all error details
-        result = run_command(cmd, capture_output=False)
+        # Run PyInstaller with output capture to see error details
+        result = run_command(cmd, check=False)
+        if result.returncode != 0:
+            print(f"[ERROR] PyInstaller failed with return code {result.returncode}")
+            print("STDOUT:", result.stdout)
+            print("STDERR:", result.stderr)
+            raise subprocess.CalledProcessError(result.returncode, cmd)
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] PyInstaller failed with virtual env python: {e}")
         print("Trying with system python...")
-        result = run_command([sys.executable, "-m", "PyInstaller", spec_file], capture_output=False)
+        try:
+            result = run_command([sys.executable, "-m", "PyInstaller", spec_file], check=False)
+            if result.returncode != 0:
+                print(f"[ERROR] PyInstaller failed with system python too, return code {result.returncode}")
+                print("STDOUT:", result.stdout)
+                print("STDERR:", result.stderr)
+                print(f"Build failed with error: Command '{[sys.executable, '-m', 'PyInstaller', spec_file]}' returned non-zero exit status {result.returncode}.")
+                sys.exit(1)
+        except subprocess.CalledProcessError as e2:
+            print(f"Build failed with error: {e2}")
+            sys.exit(1)
     
     system = platform.system().lower()
     if system == "windows":
