@@ -36,8 +36,12 @@ a = Analysis(
     [main_script],
     pathex=[src_path, spec_root],
     binaries=[],
-    datas=[],
+    datas=[
+        # Include entire src directory as data files to ensure all modules are available
+        (src_path, 'src'),
+    ],
     hiddenimports=[
+        # Include all custom modules
         'metadataDialog',
         'manualSpindleDialog', 
         'plotDialog',
@@ -47,11 +51,29 @@ a = Analysis(
         'tiffFunctions',
         'version',
         'keypress_method',
-        'spindlePreviewDialog'
+        'spindlePreviewDialog',
+        # Include common scientific computing modules that might be missed
+        'numpy',
+        'matplotlib',
+        'matplotlib.backends.backend_qt5agg',
+        'PIL',
+        'PIL.Image',
+        'pkg_resources',
+        'pkg_resources.py2_warn',
+        'importlib.metadata',
+        'importlib.metadata._compat',
+        'importlib.metadata._functools',
+        'importlib.metadata._itertools',
+        'importlib.metadata._meta',
+        'importlib.metadata._text',
+        # PySide6 modules
+        'PySide6.QtCore',
+        'PySide6.QtGui', 
+        'PySide6.QtWidgets',
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=[os.path.join(os.path.dirname(os.path.abspath(sys.argv[0] if hasattr(sys, 'argv') and sys.argv else '.')), 'runtime_hook_src_modules.py')],
     excludes=[],
     noarchive=False,
     optimize=0,

@@ -1,4 +1,20 @@
 import sys
+import os
+
+# Handle PyInstaller frozen executable
+if getattr(sys, 'frozen', False):
+    # We're running in a PyInstaller bundle
+    bundle_dir = sys._MEIPASS
+    src_dir = os.path.join(bundle_dir, 'src')
+    
+    # Add src directory to Python path if it exists
+    if os.path.exists(src_dir) and src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+    
+    # Also add the bundle directory
+    if bundle_dir not in sys.path:
+        sys.path.insert(0, bundle_dir)
+
 from PySide6.QtWidgets import (QApplication, QCheckBox, QMainWindow, QPushButton, QLabel,
                                QSpinBox, QTableView, QWidget, QVBoxLayout,
                                QHBoxLayout, QGridLayout, QSizePolicy,
@@ -7,14 +23,46 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QMainWindow, QPushButton
 from PySide6.QtGui import (QPixmap, QFont, QPainter, QBrush, QGradient,
                            QTransform, QKeyEvent, QIcon)
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel, QEvent
-import tiffFunctions as tiffF
-import threshFunctions as threshF
-import curveFitData as cFD
-import plotSpindle as pS
-import plotDialog as pD
-import manualSpindleDialog as mSD
-import metadataDialog as mdD
-from version import VERSION_DISPLAY
+
+# Import local modules with error handling
+try:
+    import tiffFunctions as tiffF
+    import threshFunctions as threshF
+    import curveFitData as cFD
+    import plotSpindle as pS
+    import plotDialog as pD
+    import manualSpindleDialog as mSD
+    import metadataDialog as mdD
+    from version import VERSION_DISPLAY
+except ImportError as e:
+    print(f"[ERROR] Failed to import required module: {e}")
+    print(f"[DEBUG] Python path: {sys.path}")
+    print(f"[DEBUG] Current working directory: {os.getcwd()}")
+    if getattr(sys, 'frozen', False):
+        print(f"[DEBUG] PyInstaller bundle directory: {sys._MEIPASS}")
+        print(f"[DEBUG] Bundle contents: {os.listdir(sys._MEIPASS)}")
+        src_dir = os.path.join(sys._MEIPASS, 'src')
+        if os.path.exists(src_dir):
+            print(f"[DEBUG] src directory contents: {os.listdir(src_dir)}")
+    raise
+
+# Force PyInstaller to include all required modules
+# These imports ensure PyInstaller detects and includes these modules
+try:
+    import keypress_method
+    import spindlePreviewDialog
+    # Re-import all modules to ensure they're included
+    import metadataDialog
+    import manualSpindleDialog
+    import plotDialog
+    import plotSpindle
+    import curveFitData
+    import threshFunctions
+    import tiffFunctions
+    import version
+except ImportError as e:
+    print(f"[WARNING] Could not import module: {e}")
+
 import os
 from numpy import zeros, arange
 import matplotlib.pyplot as plt

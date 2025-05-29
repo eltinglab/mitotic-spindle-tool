@@ -212,6 +212,16 @@ def build_with_pyinstaller(python_executable):
     env = os.environ.copy()
     env['PYTHONPATH'] = os.path.join(root_dir, 'src')
     
+    # Copy runtime hook to ensure it's available for PyInstaller
+    try:
+        runtime_hook_source = os.path.join(script_dir, "runtime_hook_src_modules.py")
+        if os.path.exists(runtime_hook_source):
+            print(f"[INFO] [OK] Runtime hook found at {runtime_hook_source}")
+        else:
+            print(f"[WARNING] Runtime hook not found at {runtime_hook_source}")
+    except Exception as e:
+        print(f"[WARNING] Error checking runtime hook: {e}")
+    
     # Use system python if we couldn't set up venv properly
     if python_executable == sys.executable:
         cmd = [sys.executable, "-m", "PyInstaller", spec_file]
