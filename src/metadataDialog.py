@@ -11,7 +11,12 @@ class MetadataDialog(QDialog):
     def __init__(self, tiff_filename, parent=None):
         super().__init__(parent)
         self.tiff_filename = tiff_filename
-        self.setWindowTitle(f"Metadata - {tiff_filename.split('/')[-1] if '/' in tiff_filename else tiff_filename.split('\\')[-1]}")
+        # Extract filename from path (handle both Unix and Windows paths)
+        if '/' in tiff_filename:
+            filename = tiff_filename.split('/')[-1]
+        else:
+            filename = tiff_filename.split('\\')[-1]
+        self.setWindowTitle(f"Metadata - {filename}")
         self.resize(600, 500)
         
         self.setupUI()
