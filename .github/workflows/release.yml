@@ -112,16 +112,16 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-            executable: mitotic-spindle-tool-linux
+            executable: mitotic-spindle-tool
             package: mitotic-spindle-tool-linux.tar.gz
             appimage: mitotic-spindle-tool-linux.AppImage
           - os: windows-latest
             platform: windows
-            executable: mitotic-spindle-tool-win.exe
+            executable: mitotic-spindle-tool.exe
             package: mitotic-spindle-tool-win.exe
           - os: macos-latest
             platform: macos
-            executable: mitotic-spindle-tool-macos
+            executable: mitotic-spindle-tool
             package: mitotic-spindle-tool-macos.dmg
             
     runs-on: ${{ matrix.os }}
@@ -178,34 +178,8 @@ jobs:
         echo "Expected executable: ${{ matrix.executable }}"
         ls -la dist/
         
-        # Check for platform-specific executable first, then base executable
         if [[ -f "dist/${{ matrix.executable }}" ]]; then
-          echo "✅ Platform-specific executable found: ${{ matrix.executable }}"
-        elif [[ "${{ matrix.platform }}" == "macos" && -f "dist/mitotic-spindle-tool" ]]; then
-          echo "✅ Base executable found for macOS: mitotic-spindle-tool"
-          # Copy to expected name for consistency
-          cp "dist/mitotic-spindle-tool" "dist/${{ matrix.executable }}"
-          echo "✅ Copied to platform-specific name: ${{ matrix.executable }}"
-        elif [[ "${{ matrix.platform }}" == "linux" && -f "dist/mitotic-spindle-tool" ]]; then
-          echo "✅ Base executable found for Linux: mitotic-spindle-tool"
-          # Copy to expected name for consistency
-          cp "dist/mitotic-spindle-tool" "dist/${{ matrix.executable }}"
-          echo "✅ Copied to platform-specific name: ${{ matrix.executable }}"
-        elif [[ "${{ matrix.platform }}" == "windows" && -f "dist/mitotic-spindle-tool.exe" ]]; then
-          echo "✅ Base executable found for Windows: mitotic-spindle-tool.exe"
-          # Copy to expected name for consistency
-          cp "dist/mitotic-spindle-tool.exe" "dist/${{ matrix.executable }}"
-          echo "✅ Copied to platform-specific name: ${{ matrix.executable }}"
-        else
-          echo "❌ No executable found"
-          echo "Looking for: dist/${{ matrix.executable }}"
-          echo "Also checked for base executable variants"
-          exit 1
-        fi
-        
-        # Verify final executable exists
-        if [[ -f "dist/${{ matrix.executable }}" ]]; then
-          echo "✅ Final executable verified: ${{ matrix.executable }}"
+          echo "✅ Executable built successfully: ${{ matrix.executable }}"
           
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             if [[ -f "dist/${{ matrix.appimage }}" ]]; then
@@ -215,7 +189,9 @@ jobs:
             fi
           fi
         else
-          echo "❌ Final verification failed"
+          echo "❌ Executable not found: dist/${{ matrix.executable }}"
+          echo "Contents of dist/:"
+          ls -la dist/
           exit 1
         fi
         
@@ -257,19 +233,40 @@ jobs:
       run: |
         TAG_NAME="${{ needs.auto-release.outputs.tag_name }}"
         
+        echo "📤 Uploading release assets for ${{ matrix.platform }}"
+        echo "Available files in dist/:"
+        ls -la dist/
+        
         if [[ "${{ matrix.platform }}" == "windows" ]]; then
-          gh release upload "$TAG_NAME" ./dist/${{ matrix.executable }} --clobber
+          # Upload the Windows executable with the final name
+          if [[ -f "dist/mitotic-spindle-tool-win.exe" ]]; then
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-win.exe --clobber
+          elif [[ -f "dist/${{ matrix.executable }}" ]]; then
+            # Copy to expected release name and upload
+            cp "dist/${{ matrix.executable }}" "dist/mitotic-spindle-tool-win.exe"
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-win.exe --clobber
+          fi
         elif [[ "${{ matrix.platform }}" == "macos" ]]; then
-          if [[ -f "./dist/${{ matrix.package }}" ]]; then
+          # Upload the macOS DMG with the final name
+          if [[ -f "dist/mitotic-spindle-tool-macos.dmg" ]]; then
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-macos.dmg --clobber
+          elif [[ -f "dist/${{ matrix.package }}" ]]; then
             gh release upload "$TAG_NAME" ./dist/${{ matrix.package }} --clobber
           elif [[ -f "./dist/mitotic-spindle-tool-macos.tar.gz" ]]; then
             gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-macos.tar.gz --clobber
           fi
         else
-          gh release upload "$TAG_NAME" ./dist/${{ matrix.package }} --clobber
+          # Linux - upload both tar.gz and AppImage with final names
+          if [[ -f "dist/mitotic-spindle-tool-linux.tar.gz" ]]; then
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-linux.tar.gz --clobber
+          elif [[ -f "dist/${{ matrix.package }}" ]]; then
+            gh release upload "$TAG_NAME" ./dist/${{ matrix.package }} --clobber
+          fi
           
           # Upload AppImage if it exists
-          if [[ -f "./dist/${{ matrix.appimage }}" ]]; then
+          if [[ -f "dist/mitotic-spindle-tool-linux.AppImage" ]]; then
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-linux.AppImage --clobber
+          elif [[ -f "dist/${{ matrix.appimage }}" ]]; then
             gh release upload "$TAG_NAME" ./dist/${{ matrix.appimage }} --clobber
           fi
         fi
