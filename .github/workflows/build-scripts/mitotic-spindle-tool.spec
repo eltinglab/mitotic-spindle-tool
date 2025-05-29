@@ -18,9 +18,19 @@ src_path = os.path.join(spec_root, 'src')
 main_script = os.path.join(src_path, 'spindleGUI.py')
 icon_path = os.path.join(spec_root, 'icons', 'EltingLabSpindle.ico')
 
+# Add src to Python path to ensure modules can be found
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
 # Ensure the main script exists
 if not os.path.exists(main_script):
     raise FileNotFoundError(f"Main script not found: {main_script}")
+
+# Print debug information
+print(f"[SPEC] Project root: {spec_root}")
+print(f"[SPEC] Source path: {src_path}")
+print(f"[SPEC] Main script: {main_script}")
+print(f"[SPEC] Icon path: {icon_path}")
 
 a = Analysis(
     [main_script],

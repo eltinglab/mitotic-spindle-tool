@@ -19,7 +19,7 @@ from pathlib import Path
 
 def get_current_version():
     """Get current version from version.py"""
-    version_file = Path("src/version.py")
+    version_file = Path("../../src/version.py")
     if not version_file.exists():
         return "1.0.0"
     
@@ -75,7 +75,7 @@ version = __version__'''
 
 def update_pyproject_toml(new_version):
     """Update pyproject.toml for compatibility"""
-    pyproject_file = Path("pyproject.toml")
+    pyproject_file = Path("../../pyproject.toml")
     
     if not pyproject_file.exists():
         return
