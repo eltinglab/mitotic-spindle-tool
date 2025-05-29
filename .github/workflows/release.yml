@@ -112,16 +112,16 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-            executable: mitotic-spindle-tool-linux
+            executable: mitotic-spindle-tool
             package: mitotic-spindle-tool-linux.tar.gz
             appimage: mitotic-spindle-tool-linux.AppImage
           - os: windows-latest
             platform: windows
-            executable: mitotic-spindle-tool-win.exe
+            executable: mitotic-spindle-tool.exe
             package: mitotic-spindle-tool-win.exe
           - os: macos-latest
             platform: macos
-            executable: mitotic-spindle-tool-macos
+            executable: mitotic-spindle-tool
             package: mitotic-spindle-tool-macos.dmg
             
     runs-on: ${{ matrix.os }}
@@ -164,22 +164,34 @@ jobs:
       env:
         CI: true
       run: |
+        echo "🏗️ Starting build process..."
+        echo "Platform: ${{ matrix.platform }}"
+        echo "Expected executable: ${{ matrix.executable }}"
         python .github/workflows/build-scripts/build.py
+        echo "🔍 Build completed, checking dist/ contents:"
+        ls -la dist/ || echo "dist/ directory not found"
         
     - name: Verify build
       shell: bash
       run: |
+        echo "🔍 Checking for built executables..."
+        echo "Expected executable: ${{ matrix.executable }}"
+        ls -la dist/
+        
         if [[ -f "dist/${{ matrix.executable }}" ]]; then
-          echo "✅ Executable built successfully"
-          ls -la dist/
+          echo "✅ Executable built successfully: ${{ matrix.executable }}"
           
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             if [[ -f "dist/${{ matrix.appimage }}" ]]; then
               echo "✅ AppImage created successfully"
+            else
+              echo "ℹ️ AppImage not found (may be expected)"
             fi
           fi
         else
-          echo "❌ Executable not found"
+          echo "❌ Executable not found: dist/${{ matrix.executable }}"
+          echo "Contents of dist/:"
+          ls -la dist/
           exit 1
         fi
         
@@ -215,32 +227,46 @@ jobs:
           fi
         fi
         cd ..
-            tar -czf mitotic-spindle-tool-macos.tar.gz ${{ matrix.executable }}
-          fi
-        else
-          tar -czf ${{ matrix.package }} ${{ matrix.executable }} run-mitotic-spindle-tool.sh 2>/dev/null || \
-          tar -czf ${{ matrix.package }} ${{ matrix.executable }}
-        fi
-        cd ..
         
     - name: Upload release assets
       shell: bash
       run: |
         TAG_NAME="${{ needs.auto-release.outputs.tag_name }}"
         
+        echo "📤 Uploading release assets for ${{ matrix.platform }}"
+        echo "Available files in dist/:"
+        ls -la dist/
+        
         if [[ "${{ matrix.platform }}" == "windows" ]]; then
-          gh release upload "$TAG_NAME" ./dist/${{ matrix.executable }} --clobber
+          # Upload the Windows executable with the final name
+          if [[ -f "dist/mitotic-spindle-tool-win.exe" ]]; then
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-win.exe --clobber
+          elif [[ -f "dist/${{ matrix.executable }}" ]]; then
+            # Copy to expected release name and upload
+            cp "dist/${{ matrix.executable }}" "dist/mitotic-spindle-tool-win.exe"
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-win.exe --clobber
+          fi
         elif [[ "${{ matrix.platform }}" == "macos" ]]; then
-          if [[ -f "./dist/${{ matrix.package }}" ]]; then
+          # Upload the macOS DMG with the final name
+          if [[ -f "dist/mitotic-spindle-tool-macos.dmg" ]]; then
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-macos.dmg --clobber
+          elif [[ -f "dist/${{ matrix.package }}" ]]; then
             gh release upload "$TAG_NAME" ./dist/${{ matrix.package }} --clobber
           elif [[ -f "./dist/mitotic-spindle-tool-macos.tar.gz" ]]; then
             gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-macos.tar.gz --clobber
           fi
         else
-          gh release upload "$TAG_NAME" ./dist/${{ matrix.package }} --clobber
+          # Linux - upload both tar.gz and AppImage with final names
+          if [[ -f "dist/mitotic-spindle-tool-linux.tar.gz" ]]; then
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-linux.tar.gz --clobber
+          elif [[ -f "dist/${{ matrix.package }}" ]]; then
+            gh release upload "$TAG_NAME" ./dist/${{ matrix.package }} --clobber
+          fi
           
           # Upload AppImage if it exists
-          if [[ -f "./dist/${{ matrix.appimage }}" ]]; then
+          if [[ -f "dist/mitotic-spindle-tool-linux.AppImage" ]]; then
+            gh release upload "$TAG_NAME" ./dist/mitotic-spindle-tool-linux.AppImage --clobber
+          elif [[ -f "dist/${{ matrix.appimage }}" ]]; then
             gh release upload "$TAG_NAME" ./dist/${{ matrix.appimage }} --clobber
           fi
         fi

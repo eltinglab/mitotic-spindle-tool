@@ -71,3 +71,68 @@ def threshXArr():
         array[i - 1 : i + 2, i - 1 : i + 2] = 1
         array[sM1 - i - 1 : sM1 - i + 2, i - 1 : i + 2] = 1
     return array
+
+# extracts and returns TIFF metadata as a dictionary
+def getTiffMetadata(tiffFileName):
+    """
+    Extract metadata from a TIFF file.
+    Returns a dictionary with available metadata information.
+    """
+    try:
+        tiffImage = Image.open(tiffFileName)
+        
+        metadata = {}
+        
+        # Basic image information
+        metadata['Filename'] = tiffFileName.split('/')[-1] if '/' in tiffFileName else tiffFileName.split('\\')[-1]
+        metadata['Format'] = tiffImage.format
+        metadata['Mode'] = tiffImage.mode
+        metadata['Size'] = f"{tiffImage.size[0]} x {tiffImage.size[1]} pixels"
+        metadata['Number of Frames'] = getattr(tiffImage, "n_frames", 1)
+        
+        # EXIF data if available
+        if hasattr(tiffImage, '_getexif') and tiffImage._getexif() is not None:
+            exif_data = tiffImage._getexif()
+            for tag, value in exif_data.items():
+                metadata[f'EXIF_{tag}'] = str(value)
+        
+        # TIFF tags
+        if hasattr(tiffImage, 'tag') and tiffImage.tag is not None:
+            for tag, value in tiffImage.tag.items():
+                tag_name = f"Tag_{tag}"
+                if isinstance(value, (list, tuple)) and len(value) == 1:
+                    metadata[tag_name] = str(value[0])
+                else:
+                    metadata[tag_name] = str(value)
+        
+        # ImageJ specific metadata if present
+        if hasattr(tiffImage, 'tag_v2'):
+            # ImageJ uses tag 270 for ImageDescription
+            if 270 in tiffImage.tag_v2:
+                imagej_info = tiffImage.tag_v2[270]
+                if imagej_info and 'ImageJ' in str(imagej_info):
+                    metadata['ImageJ_Info'] = str(imagej_info)
+            
+            # Software tag (tag 305)
+            if 305 in tiffImage.tag_v2:
+                metadata['Software'] = str(tiffImage.tag_v2[305])
+            
+            # Resolution tags
+            if 282 in tiffImage.tag_v2:  # X Resolution
+                metadata['X_Resolution'] = str(tiffImage.tag_v2[282])
+            if 283 in tiffImage.tag_v2:  # Y Resolution  
+                metadata['Y_Resolution'] = str(tiffImage.tag_v2[283])
+            if 296 in tiffImage.tag_v2:  # Resolution Unit
+                res_unit = tiffImage.tag_v2[296]
+                unit_names = {1: 'No unit', 2: 'Inch', 3: 'Centimeter'}
+                metadata['Resolution_Unit'] = unit_names.get(res_unit, f'Unknown ({res_unit})')
+        
+        # Check for additional info
+        if hasattr(tiffImage, 'info') and tiffImage.info:
+            for key, value in tiffImage.info.items():
+                metadata[f'Info_{key}'] = str(value)
+                
+        return metadata
+        
+    except Exception as e:
+        return {'Error': f'Failed to read metadata: {str(e)}'}
