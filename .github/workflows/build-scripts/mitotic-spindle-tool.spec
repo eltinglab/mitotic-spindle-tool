@@ -1,9 +1,15 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
+# Get the absolute path to the project root from this spec file location
+spec_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+src_path = os.path.join(spec_root, 'src')
+main_script = os.path.join(src_path, 'spindleGUI.py')
+icon_path = os.path.join(spec_root, 'icons', 'EltingLabSpindle.ico')
 
 a = Analysis(
-    ['../../../src/spindleGUI.py'],
-    pathex=['../../../src', '../../..'],
+    [main_script],
+    pathex=[src_path, spec_root],
     binaries=[],
     datas=[],
     hiddenimports=[
@@ -46,5 +52,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icons/EltingLabSpindle.ico',
+    icon=icon_path,
 )
