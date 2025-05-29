@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=45", "wheel", "setuptools_scm"]
+requires = ["setuptools>=70.0.0", "wheel", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mitotic-spindle-tool"
-version = "1.1.6"
+version = "1.1.7"
 authors = [
     {name = "Kergan Sanderson"},
     {name = "Joe Lannan"},
@@ -30,7 +30,7 @@ classifiers = [
 dependencies = [
     "PySide6",
     "numpy",
-    "scipy",
+    "scipy", 
     "matplotlib",
     "seaborn",
 ]
@@ -53,5 +53,6 @@ py-modules = [
     "manualSpindleDialog",
     "spindlePreviewDialog",
     "threshFunctions",
-    "tiffFunctions"
+    "tiffFunctions",
+    "metadataDialog"
 ]

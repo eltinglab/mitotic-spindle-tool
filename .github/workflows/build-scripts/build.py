@@ -9,6 +9,7 @@ import sys
 import platform
 import subprocess
 import shutil
+import tarfile
 from pathlib import Path
 
 # Get the root directory of the project (parent of .github)
@@ -20,18 +21,19 @@ os.chdir(root_dir)  # Change to root directory for the build process
 sys.path.insert(0, os.path.join(root_dir, 'src'))
 from version import __version__, VERSION_DISPLAY
 
-def run_command(cmd, check=True):
+def run_command(cmd, check=True, capture_output=True):
     """Run a command and return the result"""
     print(f"Running: {cmd}")
     if isinstance(cmd, str):
-        result = subprocess.run(cmd, shell=True, check=check, capture_output=True, text=True)
+        result = subprocess.run(cmd, shell=True, check=check, capture_output=capture_output, text=True)
     else:
-        result = subprocess.run(cmd, check=check, capture_output=True, text=True)
+        result = subprocess.run(cmd, check=check, capture_output=capture_output, text=True)
     
-    if result.stdout:
-        print(result.stdout)
-    if result.stderr:
-        print(result.stderr, file=sys.stderr)
+    if capture_output:
+        if result.stdout:
+            print(result.stdout)
+        if result.stderr:
+            print(result.stderr, file=sys.stderr)
     
     return result
 
@@ -152,6 +154,24 @@ def build_with_pyinstaller(python_executable):
     # Get the spec file path relative to root directory
     spec_file = ".github/workflows/build-scripts/mitotic-spindle-tool.spec"
     
+    # Verify paths exist
+    if not os.path.exists(spec_file):
+        print(f"[ERROR] Spec file not found: {spec_file}")
+        return None
+    
+    if not os.path.exists("src/spindleGUI.py"):
+        print(f"[ERROR] Main script not found: src/spindleGUI.py")
+        return None
+    
+    if not os.path.exists("icons/EltingLabSpindle.ico"):
+        print(f"[ERROR] Icon file not found: icons/EltingLabSpindle.ico")
+        return None
+        
+    print(f"[INFO] Current working directory: {os.getcwd()}")
+    print(f"[INFO] Spec file path: {os.path.abspath(spec_file)}")
+    print(f"[INFO] Main script path: {os.path.abspath('src/spindleGUI.py')}")
+    print(f"[INFO] Icon path: {os.path.abspath('icons/EltingLabSpindle.ico')}")
+    
     # Use system python if we couldn't set up venv properly
     if python_executable == sys.executable:
         cmd = [sys.executable, "-m", "PyInstaller", spec_file]
@@ -159,12 +179,27 @@ def build_with_pyinstaller(python_executable):
         cmd = [python_executable, "-m", "PyInstaller", spec_file]
     
     try:
-        # Run PyInstaller
-        result = run_command(cmd)
+        # Run PyInstaller with output capture to see error details
+        result = run_command(cmd, check=False)
+        if result.returncode != 0:
+            print(f"[ERROR] PyInstaller failed with return code {result.returncode}")
+            print("STDOUT:", result.stdout)
+            print("STDERR:", result.stderr)
+            raise subprocess.CalledProcessError(result.returncode, cmd)
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] PyInstaller failed with virtual env python: {e}")
         print("Trying with system python...")
-        result = run_command([sys.executable, "-m", "PyInstaller", spec_file])
+        try:
+            result = run_command([sys.executable, "-m", "PyInstaller", spec_file], check=False)
+            if result.returncode != 0:
+                print(f"[ERROR] PyInstaller failed with system python too, return code {result.returncode}")
+                print("STDOUT:", result.stdout)
+                print("STDERR:", result.stderr)
+                print(f"Build failed with error: Command '{[sys.executable, '-m', 'PyInstaller', spec_file]}' returned non-zero exit status {result.returncode}.")
+                sys.exit(1)
+        except subprocess.CalledProcessError as e2:
+            print(f"Build failed with error: {e2}")
+            sys.exit(1)
     
     system = platform.system().lower()
     if system == "windows":

@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QMainWindow, QPushButton
                                QFileDialog, QSplitter, QFrame, QSplitterHandle,
                                QAbstractItemView, QDialog)
 from PySide6.QtGui import (QPixmap, QFont, QPainter, QBrush, QGradient,
-                           QTransform, QKeyEvent)
+                           QTransform, QKeyEvent, QIcon)
 from PySide6.QtCore import Qt, QDir, QAbstractTableModel, QEvent
 import tiffFunctions as tiffF
 import threshFunctions as threshF
@@ -37,6 +37,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Mitotic Spindle Image Analysis")
+        
+        # Set the application icon for window, taskbar, etc.
+        self.setApplicationIcon()
         
         # Update the version for new releases
         versionNumber = VERSION_DISPLAY
@@ -307,6 +310,27 @@ class MainWindow(QMainWindow):
                              qFrameRect.topLeft().y(),
                              xSize, ySize)
         centerApplication(770, 450)
+    
+    def setApplicationIcon(self):
+        """Set the application icon for window, taskbar, and dock"""
+        try:
+            # Use the primary icon path
+            icon_path = 'icons/EltingLabSpindle.ico'
+            
+            if os.path.exists(icon_path):
+                icon = QIcon(icon_path)
+                if not icon.isNull():
+                    # Set window icon for all platforms (title bar, taskbar, dock)
+                    self.setWindowIcon(icon)
+                    # Also set the application icon globally
+                    QApplication.instance().setWindowIcon(icon)
+                    print(f"✅ Application icon set successfully: {icon_path}")
+                    return
+            
+            print("⚠️ Warning: Could not find application icon file")
+            
+        except Exception as e:
+            print(f"⚠️ Warning: Failed to set application icon: {e}")
     
     # handle import .tiff button push
     def onInputTiffClicked(self):
