@@ -124,14 +124,14 @@ jobs:
           # Check for AppImage on Linux
           if [[ "${{ matrix.platform }}" == "linux" ]]; then
             echo "" >> build_report.md
-            if [[ -f "dist/mitotic-spindle-tool.AppImage" ]]; then
+            if [[ -f "dist/mitotic-spindle-tool-linux.AppImage" ]]; then
               echo "**[SUCCESS]** **AppImage created successfully** 📦" >> build_report.md
-              APPIMAGE_SIZE=$(stat -c%s "dist/mitotic-spindle-tool.AppImage")
+              APPIMAGE_SIZE=$(stat -c%s "dist/mitotic-spindle-tool-linux.AppImage")
               APPIMAGE_SIZE_MB=$(python3 -c "print(f'{$APPIMAGE_SIZE / 1024 / 1024:.2f}')")
               echo "**AppImage Size**: ${APPIMAGE_SIZE_MB} MB" >> build_report.md
               
               # Verify AppImage is executable
-              if [[ -x "dist/mitotic-spindle-tool.AppImage" ]]; then
+              if [[ -x "dist/mitotic-spindle-tool-linux.AppImage" ]]; then
                 echo "**AppImage Status**: ✅ Executable and ready for distribution" >> build_report.md
               else
                 echo "**AppImage Status**: ⚠️ Created but not executable" >> build_report.md
@@ -199,7 +199,7 @@ jobs:
           dist/mitotic-spindle-tool-${{ matrix.platform }}-pr${{ needs.pr-info.outputs.pr_number }}.*
           dist/mitotic-spindle-tool-${{ matrix.platform }}.tar.gz
           dist/mitotic-spindle-tool-${{ matrix.platform }}.dmg
-          dist/mitotic-spindle-tool.AppImage
+          dist/mitotic-spindle-tool-linux.AppImage
           build_report.md
         retention-days: 30
         
