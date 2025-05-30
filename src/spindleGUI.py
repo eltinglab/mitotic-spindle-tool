@@ -65,6 +65,7 @@ except ImportError as e:
 
 import os
 from numpy import zeros, arange
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -169,7 +170,7 @@ class MainWindow(QMainWindow):
         self.dataTableArray = None
         
         # Hotkeys information
-        self.hotkeysLabel = QLabel("Hotkeys: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iter ±1 | A/D GOL Factor ±1 | Space Preview | M Manual | E Export")
+        self.hotkeysLabel = QLabel("Created by the Elting Lab\n github.com/EltingLab")
         self.hotkeysLabel.setWordWrap(True)
         self.hotkeysLabel.setStyleSheet("color: #777777; font-size: 9pt;")
 
@@ -584,28 +585,125 @@ class MainWindow(QMainWindow):
             # Automatically generate preview for the next image
             self.onPreviewClicked()
     
-    # write the data to a textfile
+    # write the data to a textfile, CSV, or Excel file
     def onExportDataClicked(self):
         if self.fileName:
+            # Generate default filename based on the imported TIFF file
+            import os
+            base_name = os.path.splitext(os.path.basename(self.fileName))[0]
+            default_name = f"{base_name}_data.txt"
+            
+            # Use the directory of the TIFF file as the default directory
+            default_dir = os.path.dirname(self.fileName)
+            default_path = os.path.join(default_dir, default_name)
 
-            # prompt the user for the save location and file name
+            # prompt the user for the save location and file name with multiple format options
             fileName, filter = QFileDialog.getSaveFileName(
                     parent=self, caption='Export Image Data',
-                    dir=QDir.homePath(), filter="*.txt")
+                    dir=default_path, 
+                    filter="Text files (*.txt);;CSV files (*.csv);;Excel files (*.xlsx)")
             if not fileName:
                 return None # cancel the export
             
-            with open(fileName, "w", encoding="utf-8") as f:
-
-                for column in range(self.dataTableArray.shape[1]):
-                    f.write(F"{cFD.DATA_NAMES[column]}\n")
-
-                    for row in range(self.dataTableArray.shape[0]):
-                        f.write(F"{self.dataTableArray[row, column]:.4f}\n")
+            # Auto-append file extension if not present and update filename for format
+            if filter == "CSV files (*.csv)":
+                if not fileName.lower().endswith('.csv'):
+                    # Replace .txt extension with .csv if present, otherwise just add .csv
+                    if fileName.lower().endswith('.txt'):
+                        fileName = fileName[:-4] + '.csv'
+                    else:
+                        fileName += '.csv'
+            elif filter == "Excel files (*.xlsx)":
+                if not fileName.lower().endswith('.xlsx'):
+                    # Replace .txt extension with .xlsx if present, otherwise just add .xlsx
+                    if fileName.lower().endswith('.txt'):
+                        fileName = fileName[:-4] + '.xlsx'
+                    else:
+                        fileName += '.xlsx'
+            elif filter == "Text files (*.txt)":
+                if not fileName.lower().endswith('.txt'):
+                    fileName += '.txt'
+            
+            # Determine the export format based on the selected filter or file extension
+            if filter == "CSV files (*.csv)" or fileName.lower().endswith('.csv'):
+                self._export_csv(fileName)
+            elif filter == "Excel files (*.xlsx)" or fileName.lower().endswith('.xlsx'):
+                self._export_excel(fileName)
+            else:
+                # Default to original text format (unchanged from original implementation)
+                self._export_text(fileName)
+    
+    def _export_text(self, fileName):
+        """Export data in the original text format - unchanged from original implementation"""
+        with open(fileName, "w", encoding="utf-8") as f:
+            for column in range(self.dataTableArray.shape[1]):
+                f.write(F"{cFD.DATA_NAMES[column]}\n")
+                for row in range(self.dataTableArray.shape[0]):
+                    f.write(F"{self.dataTableArray[row, column]:.4f}\n")
+            
+            f.write("Bad Frames\n")
+            for frame in self.tossedFrames:
+                f.write(F"{frame}\n")
+    
+    def _export_csv(self, fileName):
+        """Export data in CSV format"""
+        try:
+            # Create DataFrame with measurement data
+            df = pd.DataFrame(self.dataTableArray, columns=cFD.DATA_NAMES)
+            
+            # Add frame numbers as the first column
+            df.insert(0, 'Frame', range(1, len(df) + 1))
+            
+            # Mark tossed frames
+            df['Tossed'] = df['Frame'].isin(self.tossedFrames)
+            
+            # Save to CSV
+            df.to_csv(fileName, index=False, float_format='%.4f')
+            
+            self.statusBar().showMessage(f"Data exported successfully to {fileName}", 3000)
+            
+        except Exception as e:
+            self.statusBar().showMessage(f"Error exporting CSV: {str(e)}", 5000)
+    
+    def _export_excel(self, fileName):
+        """Export data in Excel format with multiple sheets"""
+        try:
+            # Create DataFrame with measurement data
+            df = pd.DataFrame(self.dataTableArray, columns=cFD.DATA_NAMES)
+            
+            # Add frame numbers as the first column
+            df.insert(0, 'Frame', range(1, len(df) + 1))
+            
+            # Mark tossed frames
+            df['Tossed'] = df['Frame'].isin(self.tossedFrames)
+            
+            # Create Excel writer object
+            with pd.ExcelWriter(fileName, engine='openpyxl') as writer:
+                # Write main data to first sheet
+                df.to_excel(writer, sheet_name='Measurements', index=False, float_format='%.4f')
                 
-                f.write("Bad Frames\n")
-                for frame in self.tossedFrames:
-                    f.write(F"{frame}\n")
+                # Create a summary sheet with tossed frames
+                if self.tossedFrames:
+                    tossed_df = pd.DataFrame({'Tossed Frames': self.tossedFrames})
+                    tossed_df.to_excel(writer, sheet_name='Tossed Frames', index=False)
+                
+                # Add metadata sheet if TIFF file info is available
+                if hasattr(self, 'fileName') and self.fileName:
+                    import os
+                    metadata_df = pd.DataFrame({
+                        'Property': ['Source File', 'Total Frames', 'File Size (MB)'],
+                        'Value': [
+                            os.path.basename(self.fileName),
+                            self.totalFrameValue.text(),
+                            f"{os.path.getsize(self.fileName) / (1024*1024):.2f}" if os.path.exists(self.fileName) else "N/A"
+                        ]
+                    })
+                    metadata_df.to_excel(writer, sheet_name='File Info', index=False)
+            
+            self.statusBar().showMessage(f"Data exported successfully to {fileName}", 3000)
+            
+        except Exception as e:
+            self.statusBar().showMessage(f"Error exporting Excel: {str(e)}", 5000)
     
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
