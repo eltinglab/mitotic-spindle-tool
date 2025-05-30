@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QPushButton, QHBoxLayout, 
                                QLabel, QCheckBox)
-from PySide6.QtCore import Qt, QPointF, Signal
+from PySide6.QtCore import Qt, QPointF, Signal, QTimer
 from PySide6.QtGui import QPainter, QPen, QBrush, QColorConstants, QMouseEvent
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
@@ -41,14 +41,30 @@ class ManualSpindleDialog(QDialog):
         self.dragging_pole = None
         self.drag_threshold = 15  # Pixels threshold for drag detection
         
-        # Create matplotlib Figure and Canvas
-        self.figure = Figure(figsize=(8, 6), dpi=100)
+        # Performance optimization: throttle plot updates during dragging
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.timeout.connect(self._do_plot_update)
+        self.update_delay_ms = 50  # 50ms delay for smooth updates
+        
+        # Flag to prevent redundant updates
+        self.needs_update = False
+        
+        # Create matplotlib Figure and Canvas with performance optimizations
+        self.figure = Figure(figsize=(8, 6), dpi=100, facecolor='white')
+        self.figure.patch.set_facecolor('white')  # Explicit background
         self.canvas = FigureCanvas(self.figure)
+        
+        # Optimize canvas for interactive use
+        self.canvas.setFocusPolicy(Qt.ClickFocus)
         
         # Connect mouse events
         self.canvas.mpl_connect('button_press_event', self.on_mouse_press)
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         self.canvas.mpl_connect('button_release_event', self.on_mouse_release)
+        
+        # Cache axes to avoid recreation
+        self.ax = None
         
         # Setup UI
         self.setup_ui()
@@ -74,7 +90,7 @@ class ManualSpindleDialog(QDialog):
         # Checkbox for auto-detection overlay
         self.show_auto_checkbox = QCheckBox("Show automatic detection (green)")
         self.show_auto_checkbox.setChecked(True)
-        self.show_auto_checkbox.toggled.connect(self.update_plot)
+        self.show_auto_checkbox.toggled.connect(self._schedule_update)
         layout.addWidget(self.show_auto_checkbox)
         
         # Buttons
@@ -102,197 +118,242 @@ class ManualSpindleDialog(QDialog):
         if self.spindle_exists:
             self.left_pole = list(self.auto_data[1])
             self.right_pole = list(self.auto_data[2])
-        self.update_plot()
+        self._schedule_update()
     
     def apply_manual_adjustment(self):
         """Apply the manual adjustment and close dialog"""
         self.manual_positions_changed.emit(tuple(self.left_pole), tuple(self.right_pole))
         self.accept()
     
+    def _schedule_update(self):
+        """Schedule a plot update with debouncing to prevent excessive redraws"""
+        self.needs_update = True
+        if not self.update_timer.isActive():
+            self.update_timer.start(self.update_delay_ms)
+    
+    def _do_plot_update(self):
+        """Perform the actual plot update"""
+        if self.needs_update:
+            self.needs_update = False
+            self.update_plot()
+    
     def update_plot(self):
         """Update the plot with current pole positions"""
-        self.figure.clear()
-        ax = self.figure.add_subplot(111)
-        
-        # Display the original image
-        ax.imshow(self.image_arr, cmap='gray', aspect='equal')
-        
-        # Show automatic detection if enabled and exists
-        if self.show_auto_checkbox.isChecked() and self.spindle_exists:
-            auto_left = self.auto_data[1]
-            auto_right = self.auto_data[2]
-            auto_center = self.auto_data[3]
+        try:
+            # Clear figure but reuse axes if possible for better performance
+            if self.ax is None:
+                self.figure.clear()
+                self.ax = self.figure.add_subplot(111)
+            else:
+                self.ax.clear()
             
-            # Plot automatic detection curve (green)
-            x_auto = np.linspace(auto_left[0], auto_right[0], 100)
-            # Calculate quadratic curve through the three points
-            if auto_left[0] != auto_right[0]:  # Avoid division by zero
-                # Use the three points to fit a quadratic
-                try:
-                    points_x = [auto_left[0], auto_center[0], auto_right[0]]
-                    points_y = [auto_left[1], auto_center[1], auto_right[1]]
-                    coeffs = np.polyfit(points_x, points_y, 2)
-                    y_auto = np.polyval(coeffs, x_auto)
-                    ax.plot(x_auto, y_auto, 'g-', linewidth=2, alpha=0.7, label='Auto detection')
-                except:
-                    # Fallback to straight line if quadratic fitting fails
-                    y_auto = np.linspace(auto_left[1], auto_right[1], 100)
-                    ax.plot(x_auto, y_auto, 'g-', linewidth=2, alpha=0.7, label='Auto detection')
+            # Configure axes for better performance
+            self.ax.set_aspect('equal')
             
-            # Plot automatic poles (green)
-            ax.plot(auto_left[0], auto_left[1], 'go', markersize=8, alpha=0.7)
-            ax.plot(auto_right[0], auto_right[1], 'go', markersize=8, alpha=0.7)
-        
-        # Plot manual curve (blue)
-        if self.left_pole and self.right_pole:
-            x_manual = np.linspace(self.left_pole[0], self.right_pole[0], 100)
-            if self.left_pole[0] != self.right_pole[0]:  # Avoid division by zero
-                # Simple linear interpolation for manual adjustment
-                y_manual = np.linspace(self.left_pole[1], self.right_pole[1], 100)
-                ax.plot(x_manual, y_manual, 'b-', linewidth=2, label='Manual adjustment')
-        
-        # Plot manual poles (red, draggable)
-        ax.plot(self.left_pole[0], self.left_pole[1], 'ro', markersize=10, 
-                label='Left pole (draggable)')
-        ax.plot(self.right_pole[0], self.right_pole[1], 'ro', markersize=10, 
-                label='Right pole (draggable)')
-        
-        # Calculate dynamic padding based on actual element coordinates
-        image_height, image_width = self.image_arr.shape
-        
-        # Collect all drawing coordinates that need to be visible
-        all_x_coords = [self.left_pole[0], self.right_pole[0]]
-        all_y_coords = [self.left_pole[1], self.right_pole[1]]
-        
-        # Add automatic detection coordinates if shown
-        if self.show_auto_checkbox.isChecked() and self.spindle_exists:
-            auto_left = self.auto_data[1]
-            auto_right = self.auto_data[2]
-            auto_center = self.auto_data[3]
-            all_x_coords.extend([auto_left[0], auto_right[0], auto_center[0]])
-            all_y_coords.extend([auto_left[1], auto_right[1], auto_center[1]])
+            # Display the original image with optimizations
+            im = self.ax.imshow(self.image_arr, cmap='gray', aspect='equal', 
+                               interpolation='nearest', origin='upper')
             
-            # Include curve points for better boundary calculation
-            if auto_left[0] != auto_right[0]:
-                x_auto = np.linspace(auto_left[0], auto_right[0], 100)
-                try:
-                    points_x = [auto_left[0], auto_center[0], auto_right[0]]
-                    points_y = [auto_left[1], auto_center[1], auto_right[1]]
-                    coeffs = np.polyfit(points_x, points_y, 2)
-                    y_auto = np.polyval(coeffs, x_auto)
-                    all_x_coords.extend(x_auto.tolist())
-                    all_y_coords.extend(y_auto.tolist())
-                except:
-                    # Fallback to straight line
-                    y_auto = np.linspace(auto_left[1], auto_right[1], 100)
-                    all_x_coords.extend(x_auto.tolist())
-                    all_y_coords.extend(y_auto.tolist())
-        
-        # Add manual curve points
-        if self.left_pole[0] != self.right_pole[0]:
-            x_manual = np.linspace(self.left_pole[0], self.right_pole[0], 100)
-            y_manual = np.linspace(self.left_pole[1], self.right_pole[1], 100)
-            all_x_coords.extend(x_manual.tolist())
-            all_y_coords.extend(y_manual.tolist())
-        
-        # Calculate bounds of all drawing elements
-        min_x, max_x = min(all_x_coords), max(all_x_coords)
-        min_y, max_y = min(all_y_coords), max(all_y_coords)
-        
-        # Calculate overflow beyond image boundaries
-        x_overflow_left = max(0, -min_x)
-        x_overflow_right = max(0, max_x - image_width)
-        y_overflow_top = max(0, -min_y)
-        y_overflow_bottom = max(0, max_y - image_height)
-        
-        # Calculate minimum required padding (10% of image size + 5% buffer)
-        min_padding_x = image_width * 0.15  # 10% + 5% buffer
-        min_padding_y = image_height * 0.15
-        
-        # Use larger of overflow or minimum padding
-        padding_left = max(x_overflow_left, min_padding_x)
-        padding_right = max(x_overflow_right, min_padding_x)
-        padding_top = max(y_overflow_top, min_padding_y)
-        padding_bottom = max(y_overflow_bottom, min_padding_y)
-        
-        # Set axis limits with calculated padding
-        ax.set_xlim(-padding_left, image_width + padding_right)
-        ax.set_ylim(image_height + padding_bottom, -padding_top)  # Invert Y axis for image coordinates
-        ax.set_aspect('equal')
-        ax.legend()
-        ax.set_title('Manual Spindle Pole Adjustment')
-        
-        self.figure.tight_layout()
-        self.canvas.draw()
+            # Pre-calculate coordinates to minimize repeated operations
+            all_x_coords = [self.left_pole[0], self.right_pole[0]]
+            all_y_coords = [self.left_pole[1], self.right_pole[1]]
+            
+            # Show automatic detection if enabled and exists
+            if self.show_auto_checkbox.isChecked() and self.spindle_exists:
+                auto_left = self.auto_data[1]
+                auto_right = self.auto_data[2]
+                auto_center = self.auto_data[3]
+                
+                # Add auto coordinates to bounds calculation
+                all_x_coords.extend([auto_left[0], auto_right[0], auto_center[0]])
+                all_y_coords.extend([auto_left[1], auto_right[1], auto_center[1]])
+                
+                # Plot automatic detection curve (green) - optimized
+                if auto_left[0] != auto_right[0]:  # Avoid division by zero
+                    x_auto = np.linspace(auto_left[0], auto_right[0], 50)  # Reduced points for performance
+                    try:
+                        points_x = [auto_left[0], auto_center[0], auto_right[0]]
+                        points_y = [auto_left[1], auto_center[1], auto_right[1]]
+                        coeffs = np.polyfit(points_x, points_y, 2)
+                        y_auto = np.polyval(coeffs, x_auto)
+                        self.ax.plot(x_auto, y_auto, 'g-', linewidth=2, alpha=0.7, label='Auto detection')
+                        all_x_coords.extend(x_auto.tolist())
+                        all_y_coords.extend(y_auto.tolist())
+                    except np.RankWarning:
+                        # Fallback to straight line if quadratic fitting fails
+                        y_auto = np.linspace(auto_left[1], auto_right[1], 50)
+                        self.ax.plot(x_auto, y_auto, 'g-', linewidth=2, alpha=0.7, label='Auto detection')
+                        all_x_coords.extend(x_auto.tolist())
+                        all_y_coords.extend(y_auto.tolist())
+                    except Exception:
+                        # Silent fallback for any other errors
+                        pass
+                
+                # Plot automatic poles (green)
+                self.ax.plot(auto_left[0], auto_left[1], 'go', markersize=8, alpha=0.7)
+                self.ax.plot(auto_right[0], auto_right[1], 'go', markersize=8, alpha=0.7)
+            
+            # Plot manual curve (blue) - optimized
+            if self.left_pole and self.right_pole and self.left_pole[0] != self.right_pole[0]:
+                x_manual = np.linspace(self.left_pole[0], self.right_pole[0], 50)  # Reduced points
+                y_manual = np.linspace(self.left_pole[1], self.right_pole[1], 50)
+                self.ax.plot(x_manual, y_manual, 'b-', linewidth=2, label='Manual adjustment')
+                all_x_coords.extend(x_manual.tolist())
+                all_y_coords.extend(y_manual.tolist())
+            
+            # Plot manual poles (red, draggable)
+            self.ax.plot(self.left_pole[0], self.left_pole[1], 'ro', markersize=10, 
+                        label='Left pole (draggable)')
+            self.ax.plot(self.right_pole[0], self.right_pole[1], 'ro', markersize=10, 
+                        label='Right pole (draggable)')
+            
+            # Calculate dynamic padding - optimized
+            image_height, image_width = self.image_arr.shape
+            
+            # Use numpy for faster min/max operations
+            all_x_coords = np.array(all_x_coords)
+            all_y_coords = np.array(all_y_coords)
+            min_x, max_x = np.min(all_x_coords), np.max(all_x_coords)
+            min_y, max_y = np.min(all_y_coords), np.max(all_y_coords)
+            
+            # Calculate overflow and padding
+            x_overflow_left = max(0, -min_x)
+            x_overflow_right = max(0, max_x - image_width)
+            y_overflow_top = max(0, -min_y)
+            y_overflow_bottom = max(0, max_y - image_height)
+            
+            # Calculate minimum required padding (reduced for performance)
+            min_padding_x = image_width * 0.1  # Reduced from 0.15
+            min_padding_y = image_height * 0.1
+            
+            # Use larger of overflow or minimum padding
+            padding_left = max(x_overflow_left, min_padding_x)
+            padding_right = max(x_overflow_right, min_padding_x)
+            padding_top = max(y_overflow_top, min_padding_y)
+            padding_bottom = max(y_overflow_bottom, min_padding_y)
+            
+            # Set axis limits with calculated padding
+            self.ax.set_xlim(-padding_left, image_width + padding_right)
+            self.ax.set_ylim(image_height + padding_bottom, -padding_top)  # Invert Y axis
+            
+            # Add legend and title
+            self.ax.legend(loc='upper right', fontsize='small')
+            self.ax.set_title('Manual Spindle Pole Adjustment')
+            
+            # Optimize layout and drawing
+            self.figure.tight_layout(pad=1.0)
+            
+            # Force canvas update
+            self.canvas.draw_idle()  # Use draw_idle for better performance
+            
+        except Exception as e:
+            print(f"Error updating plot: {e}")
+            # Fallback: clear everything and show error
+            self.figure.clear()
+            ax = self.figure.add_subplot(111)
+            ax.text(0.5, 0.5, f'Plot update error: {str(e)}', 
+                   horizontalalignment='center', verticalalignment='center',
+                   transform=ax.transAxes, fontsize=12, color='red')
+            self.canvas.draw()
     
     def get_pole_at_position(self, x, y):
         """Check if mouse position is near a pole, return which pole or None"""
-        left_dist = np.sqrt((x - self.left_pole[0])**2 + (y - self.left_pole[1])**2)
-        right_dist = np.sqrt((x - self.right_pole[0])**2 + (y - self.right_pole[1])**2)
-        
-        if left_dist <= self.drag_threshold:
-            return 'left'
-        elif right_dist <= self.drag_threshold:
-            return 'right'
-        else:
+        if x is None or y is None:
+            return None
+            
+        try:
+            left_dist = np.sqrt((x - self.left_pole[0])**2 + (y - self.left_pole[1])**2)
+            right_dist = np.sqrt((x - self.right_pole[0])**2 + (y - self.right_pole[1])**2)
+            
+            if left_dist <= self.drag_threshold:
+                return 'left'
+            elif right_dist <= self.drag_threshold:
+                return 'right'
+            else:
+                return None
+        except (TypeError, IndexError):
             return None
     
     def on_mouse_press(self, event):
         """Handle mouse press events"""
         if event.inaxes and event.button == 1:  # Left mouse button
             self.dragging_pole = self.get_pole_at_position(event.xdata, event.ydata)
+            if self.dragging_pole:
+                # Immediate visual feedback
+                self._schedule_update()
     
     def on_mouse_move(self, event):
-        """Handle mouse move events"""
-        if self.dragging_pole and event.inaxes and event.xdata and event.ydata:
-            # Update pole position
-            if self.dragging_pole == 'left':
-                self.left_pole = [event.xdata, event.ydata]
-            elif self.dragging_pole == 'right':
-                self.right_pole = [event.xdata, event.ydata]
+        """Handle mouse move events with throttling for performance"""
+        if (self.dragging_pole and event.inaxes and 
+            event.xdata is not None and event.ydata is not None):
             
-            # Update the plot
-            self.update_plot()
+            # Update pole position
+            try:
+                if self.dragging_pole == 'left':
+                    self.left_pole = [float(event.xdata), float(event.ydata)]
+                elif self.dragging_pole == 'right':
+                    self.right_pole = [float(event.xdata), float(event.ydata)]
+                
+                # Schedule update instead of immediate update for performance
+                self._schedule_update()
+                
+            except (TypeError, ValueError):
+                # Ignore invalid coordinates
+                pass
     
     def on_mouse_release(self, event):
         """Handle mouse release events"""
-        self.dragging_pole = None
+        if self.dragging_pole:
+            self.dragging_pole = None
+            # Force final update after dragging stops
+            self.update_timer.stop()
+            self._do_plot_update()
 
     def get_manual_measurements(self):
         """Calculate measurements using manual pole positions"""
-        # Create a modified version of spindleMeasurements that uses manual poles
         return self.calculate_manual_measurements(self.left_pole, self.right_pole)
     
     def calculate_manual_measurements(self, left_pole, right_pole):
         """Calculate spindle measurements using manual pole positions"""
-        # This is a simplified version that calculates basic measurements
-        # based on manual pole positions
+        try:
+            # POLE SEPARATION (Euclidean distance)
+            pole_separation = np.sqrt((right_pole[0] - left_pole[0])**2 + 
+                                    (right_pole[1] - left_pole[1])**2)
+            
+            # ARC LENGTH (approximated as straight line for manual adjustment)
+            arc_length = pole_separation
+            
+            # For area and curvature metrics, use automatic detection if available
+            area_metric = 0.0
+            max_curvature = 0.0
+            avg_curvature = 0.0
+            
+            if self.spindle_exists:
+                try:
+                    # Get automatic measurements for comparison
+                    auto_measurements, _ = cFD.spindleMeasurements(self.image_arr, self.thresh_arr)
+                    if auto_measurements:
+                        area_metric = auto_measurements[2]  # Use auto area metric
+                        # Set minimal curvature since it's a straight line
+                        max_curvature = abs(2 * 0.001)  # Very small curvature
+                        avg_curvature = abs(0.001)
+                except Exception:
+                    pass
+            
+            return [pole_separation, arc_length, area_metric, max_curvature, avg_curvature]
+            
+        except Exception as e:
+            print(f"Error calculating manual measurements: {e}")
+            return [0.0, 0.0, 0.0, 0.0, 0.0]
+    
+    def closeEvent(self, event):
+        """Clean up when dialog is closed"""
+        # Stop any running timers
+        if hasattr(self, 'update_timer'):
+            self.update_timer.stop()
         
-        # POLE SEPARATION (Euclidean distance)
-        pole_separation = np.sqrt((right_pole[0] - left_pole[0])**2 + 
-                                (right_pole[1] - left_pole[1])**2)
-        
-        # ARC LENGTH (approximated as straight line for manual adjustment)
-        arc_length = pole_separation
-        
-        # For area and curvature metrics, we need the actual spindle pixels
-        # Use the automatic detection if available, otherwise use defaults
-        area_metric = 0.0
-        max_curvature = 0.0
-        avg_curvature = 0.0
-        
-        if self.spindle_exists:
-            # Try to calculate area between manual line and detected spindle
-            try:
-                # Get automatic measurements for comparison
-                auto_measurements, _ = cFD.spindleMeasurements(self.image_arr, self.thresh_arr)
-                if auto_measurements:
-                    area_metric = auto_measurements[2]  # Use auto area metric
-                    # Curvature will be different since we're using manual poles
-                    # For now, set to minimal curvature since it's a straight line
-                    max_curvature = abs(2 * 0.001)  # Very small curvature
-                    avg_curvature = abs(0.001)
-            except:
-                pass
-        
-        return [pole_separation, arc_length, area_metric, max_curvature, avg_curvature]
+        # Clear matplotlib figure to free memory
+        if hasattr(self, 'figure'):
+            self.figure.clear()
+            
+        super().closeEvent(event)
