@@ -358,49 +358,128 @@ def create_distribution_package(executable_path, launcher_path):
         package_path = DIST_DIR / package_name
         
         try:
-            # Create proper macOS .app bundle
+            # Create proper macOS .app bundle (works on any platform)
             app_bundle_path = create_macos_app_bundle(executable_path, DIST_DIR)
             
             if app_bundle_path:
-                # Create DMG with the app bundle
-                dmg_temp_dir = DIST_DIR / "dmg_temp"
-                dmg_temp_dir.mkdir(exist_ok=True)
+                # Check if we can create a DMG (requires hdiutil)
+                can_create_dmg = shutil.which("hdiutil") is not None
+                current_platform = platform.system().lower()
                 
-                # Copy app bundle to temp directory
-                app_name = app_bundle_path.name
-                dmg_app_path = dmg_temp_dir / app_name
-                shutil.copytree(app_bundle_path, dmg_app_path)
-                
-                # Create Applications symlink for easy installation
-                applications_link = dmg_temp_dir / "Applications"
-                if not applications_link.exists():
-                    os.symlink("/Applications", applications_link)
-                
-                # Create background image folder (optional)
-                dmg_bg_dir = dmg_temp_dir / ".background"
-                dmg_bg_dir.mkdir(exist_ok=True)
-                
-                # Copy icon for volume
-                icon_source = ICONS_DIR / "EltingLabSpindle_512x512.png"
-                if icon_source.exists():
-                    shutil.copy2(icon_source, dmg_temp_dir / ".VolumeIcon.icns")
-                
-                # Create DMG
-                run_command([
-                    "hdiutil", "create", 
-                    "-volname", "Mitotic Spindle Tool",
-                    "-srcfolder", str(dmg_temp_dir),
-                    "-ov", "-format", "UDZO",
-                    str(package_path)
-                ])
-                
-                # Clean up temp directory
-                shutil.rmtree(dmg_temp_dir)
-                
-                print(f"[SUCCESS] Created DMG with app bundle: {package_path}")
-                return package_path
+                if can_create_dmg:
+                    print(f"[INFO] Creating DMG on {current_platform} using hdiutil...")
+                    
+                    # Create DMG with the app bundle
+                    dmg_temp_dir = DIST_DIR / "dmg_temp"
+                    dmg_temp_dir.mkdir(exist_ok=True)
+                    
+                    # Copy app bundle to temp directory
+                    app_name = app_bundle_path.name
+                    dmg_app_path = dmg_temp_dir / app_name
+                    shutil.copytree(app_bundle_path, dmg_app_path)
+                    
+                    # Create Applications symlink for easy installation
+                    applications_link = dmg_temp_dir / "Applications"
+                    if not applications_link.exists():
+                        os.symlink("/Applications", applications_link)
+                    
+                    # Create background image folder (optional)
+                    dmg_bg_dir = dmg_temp_dir / ".background"
+                    dmg_bg_dir.mkdir(exist_ok=True)
+                    
+                    # Copy icon for volume
+                    icon_source = ICONS_DIR / "EltingLabSpindle_512x512.png"
+                    if icon_source.exists():
+                        shutil.copy2(icon_source, dmg_temp_dir / ".VolumeIcon.icns")
+                    
+                    # Create a README for macOS users about security warnings
+                    readme_content = """# Mitotic Spindle Tool - macOS Installation
+
+## Security Notice
+This application is not signed with an Apple Developer certificate, so macOS may show security warnings.
+
+## Installation Steps
+1. Drag "Mitotic Spindle Tool.app" to the Applications folder
+2. If macOS blocks the app, follow these steps:
+
+### Method 1: Right-click to Open
+1. Right-click (or Control+click) on "Mitotic Spindle Tool.app" in Applications
+2. Select "Open" from the context menu
+3. Click "Open" in the security dialog
+
+### Method 2: System Preferences
+1. Go to Apple menu > System Preferences > Security & Privacy
+2. Click the "General" tab
+3. Look for a message about "Mitotic Spindle Tool" being blocked
+4. Click "Open Anyway"
+
+### Method 3: Terminal (Advanced)
+If the above methods don't work, open Terminal and run:
+```
+sudo xattr -rd com.apple.quarantine "/Applications/Mitotic Spindle Tool.app"
+```
+
+## Why These Steps Are Needed
+This application was built without an Apple Developer certificate ($99/year).
+The app is safe to use and open source - you can verify the code at:
+https://github.com/eltinglab/mitotic-spindle-tool
+
+## Support
+If you encounter issues, please report them at:
+https://github.com/eltinglab/mitotic-spindle-tool/issues
+"""
+                    
+                    readme_file = dmg_temp_dir / "README - IMPORTANT.txt"
+                    with open(readme_file, 'w') as f:
+                        f.write(readme_content)
+                    
+                    # Create DMG with better compression and verification
+                    dmg_create_cmd = [
+                        "hdiutil", "create", 
+                        "-volname", "Mitotic Spindle Tool",
+                        "-srcfolder", str(dmg_temp_dir),
+                        "-ov", "-format", "UDZO",
+                        "-imagekey", "zlib-level=9",  # Maximum compression
+                        str(package_path)
+                    ]
+                    
+                    # Add filesystem type for better compatibility
+                    if current_platform == "darwin":
+                        dmg_create_cmd.extend(["-fs", "HFS+"])
+                    
+                    result = run_command(dmg_create_cmd, check=False)
+                    
+                    if result.returncode == 0 and package_path.exists():
+                        # Verify DMG was created successfully
+                        verify_result = run_command([
+                            "hdiutil", "verify", str(package_path)
+                        ], check=False)
+                        
+                        if verify_result.returncode == 0:
+                            print(f"[SUCCESS] Created and verified DMG: {package_path}")
+                            
+                            # Add platform-specific warnings
+                            if current_platform != "darwin":
+                                print("[WARNING] DMG created on non-macOS system:")
+                                print("  - App bundle may need code signing on macOS")
+                                print("  - Users may need to allow the app in System Preferences > Security & Privacy")
+                                print("  - Consider notarizing the app for better user experience")
+                        else:
+                            print(f"[WARNING] DMG verification failed: {verify_result.stderr}")
+                            print("DMG was created but may have issues")
+                    else:
+                        print(f"[ERROR] DMG creation failed: {result.stderr}")
+                        raise subprocess.CalledProcessError(result.returncode, dmg_create_cmd)
+                    
+                    # Clean up temp directory
+                    shutil.rmtree(dmg_temp_dir)
+                    
+                    return package_path
+                else:
+                    print(f"[WARNING] hdiutil not available on {current_platform}, falling back to tar.gz")
+                    raise subprocess.CalledProcessError(1, "hdiutil not available")
             else:
-                print("[WARNING] App bundle creation failed, falling back to basic DMG")
+                print("[WARNING] App bundle creation failed, falling back to tar.gz")
                 raise subprocess.CalledProcessError(1, "app bundle creation")
             
         except subprocess.CalledProcessError as e:
@@ -409,11 +488,20 @@ def create_distribution_package(executable_path, launcher_path):
             package_name = get_platform_package_name().replace('.dmg', '.tar.gz')
             package_path = DIST_DIR / package_name
             
-            with tarfile.open(package_path, 'w:gz') as tarf:
-                tarf.add(executable_path, executable_path.name)
-                tarf.add(launcher_path, launcher_path.name)
+            # If we have an app bundle, include it in the tar.gz
+            if 'app_bundle_path' in locals() and app_bundle_path and app_bundle_path.exists():
+                with tarfile.open(package_path, 'w:gz') as tarf:
+                    tarf.add(app_bundle_path, app_bundle_path.name)
+                    if launcher_path.exists():
+                        tarf.add(launcher_path, launcher_path.name)
+                print(f"[SUCCESS] Created macOS package with app bundle: {package_path}")
+            else:
+                # Fall back to just the executable
+                with tarfile.open(package_path, 'w:gz') as tarf:
+                    tarf.add(executable_path, executable_path.name)
+                    tarf.add(launcher_path, launcher_path.name)
+                print(f"[SUCCESS] Created fallback package: {package_path}")
             
-            print(f"[SUCCESS] Created package: {package_path}")
             return package_path
         
     else:
@@ -430,13 +518,15 @@ def create_distribution_package(executable_path, launcher_path):
 
 def create_macos_app_bundle(executable_path, dist_path):
     """Create a proper macOS .app bundle"""
-    if platform.system().lower() != "darwin":
-        return None
-    
+    # Note: We can create app bundles on any platform, but they may need signing on macOS
     app_name = "Mitotic Spindle Tool.app"
     app_bundle_path = dist_path / app_name
     
     print(f"Creating macOS app bundle: {app_bundle_path}")
+    current_platform = platform.system().lower()
+    
+    if current_platform != "darwin":
+        print(f"[WARNING] Creating macOS app bundle on {current_platform} - bundle may require additional steps on macOS")
     
     # Create app bundle directory structure
     contents_dir = app_bundle_path / "Contents"
@@ -453,7 +543,7 @@ def create_macos_app_bundle(executable_path, dist_path):
         shutil.copy2(executable_path, app_executable)
         os.chmod(app_executable, 0o755)
         
-        # Create Info.plist
+        # Create Info.plist with additional security and compatibility keys
         info_plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -482,6 +572,19 @@ def create_macos_app_bundle(executable_path, dist_path):
     <true/>
     <key>NSRequiresAquaSystemAppearance</key>
     <false/>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
+    <key>NSHumanReadableCopyright</key>
+    <string>© 2025 NCSU Elting Lab. All rights reserved.</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.education</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>
