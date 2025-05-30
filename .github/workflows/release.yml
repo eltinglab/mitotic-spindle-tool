@@ -71,26 +71,48 @@ jobs:
           git push origin "$CURRENT"
           echo "✅ Created and pushed tag: $CURRENT"
           
+          # Get commit history for release notes
+          COMMIT_HISTORY=$(git log --oneline --pretty=format:"- %s (%an)" "$LATEST..${{ github.sha }}" | head -20)
+          if [ -z "$COMMIT_HISTORY" ]; then
+            COMMIT_HISTORY="- Initial release"
+          fi
+          
           # Create GitHub release
           RELEASE_BODY="## Mitotic Spindle Tool $CURRENT
           
-          ### Downloads
-          - **Windows**: \`mitotic-spindle-tool-win.exe\` (standalone executable)
-          - **Linux (Traditional)**: \`mitotic-spindle-tool-linux.tar.gz\` (includes launcher script)
-          - **Linux (AppImage)**: \`mitotic-spindle-tool-linux.AppImage\` (portable, recommended for Linux)
-          - **macOS**: \`mitotic-spindle-tool-macos.dmg\` (disk image with app bundle)
+          ### Installation Instructions
           
-          ### Installation
-          - **Windows**: Download and run \`mitotic-spindle-tool-win.exe\` directly
-          - **Linux (Traditional)**: Extract \`mitotic-spindle-tool-linux.tar.gz\` and run \`./run-mitotic-spindle-tool.sh\`
-          - **Linux (AppImage)**: Download \`mitotic-spindle-tool-linux.AppImage\`, make executable (\`chmod +x mitotic-spindle-tool-linux.AppImage\`) and run directly
-          - **macOS**: Open \`mitotic-spindle-tool-macos.dmg\` and drag the app to Applications folder
+          #### 🪟 Windows
+          1. Download \`mitotic-spindle-tool-win.exe\`
+          2. **Security Warning**: Windows may show a security warning because the executable is not digitally signed
+          3. Click \"More info\" then \"Run anyway\"
+          4. Run the executable directly - no installation required
           
-          ### Changes
-          See the commit history for detailed changes in this release.
+          #### 🐧 Linux (AppImage - Recommended)
+          1. Download \`mitotic-spindle-tool-linux.AppImage\`
+          2. **Set executable permissions**: \`chmod +x mitotic-spindle-tool-linux.AppImage\`
+          3. Run directly: \`./mitotic-spindle-tool-linux.AppImage\`
+          4. Optional: Right-click → Properties → Permissions → Allow executing as program (GUI method)
           
-          ### Requirements
-          No additional software installation required - all dependencies are bundled."
+          #### 🐧 Linux (Traditional)
+          1. Download and extract \`mitotic-spindle-tool-linux.tar.gz\`
+          2. **Set executable permissions**: \`chmod +x run-mitotic-spindle-tool.sh\`
+          3. Run: \`./run-mitotic-spindle-tool.sh\`
+          
+          #### 🍎 macOS
+          1. Download and open \`mitotic-spindle-tool-macos.dmg\`
+          2. Drag the app to your Applications folder
+          3. **Security Note**: You may need to right-click the app and select \"Open\" the first time due to Gatekeeper (unsigned app)
+          4. Alternatively, go to System Preferences → Security & Privacy → General and click \"Open Anyway\"
+          
+          ### Changes in this Release
+          $COMMIT_HISTORY
+          
+          ### Permissions and Security
+          Note that this release is not signed, so you may need to allow the app to run on your system despite warnings. You should only run this app from trusted sources like the eltinglab github repository.
+          
+          ### Issues and Feedback
+          If you encounter any issues, please open a new issue on the GitHub repository"
           
           gh release create "$CURRENT" \
             --title "Release $CURRENT" \
