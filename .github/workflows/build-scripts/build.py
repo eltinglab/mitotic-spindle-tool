@@ -790,6 +790,8 @@ Exec=mitotic-spindle-tool
 Icon=mitotic-spindle-tool
 Categories=Science;Education;
 Terminal=false
+StartupNotify=true
+StartupWMClass=mitotic-spindle-tool
 """
     
     # Write desktop file to the standard location
