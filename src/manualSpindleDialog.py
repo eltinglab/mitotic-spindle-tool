@@ -236,12 +236,12 @@ class ManualSpindleDialog(QDialog):
             self.ax.set_xlim(-padding_left, image_width + padding_right)
             self.ax.set_ylim(image_height + padding_bottom, -padding_top)  # Invert Y axis
             
-            # Add legend and title
-            self.ax.legend(loc='upper right', fontsize='small')
+            # Add legend outside the plot area and title
+            self.ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', fontsize='small')
             self.ax.set_title('Manual Spindle Pole Adjustment')
             
-            # Optimize layout and drawing
-            self.figure.tight_layout(pad=1.0)
+            # Optimize layout and drawing with extra space for legend
+            self.figure.tight_layout(pad=1.0, rect=[0, 0, 0.85, 1])
             
             # Force canvas update
             self.canvas.draw_idle()  # Use draw_idle for better performance
