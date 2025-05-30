@@ -163,6 +163,9 @@ cython_debug/
 build_report.md
 *.AppImage
 run-mitotic-spindle-tool.*
+squashfs-root/
+temp_extract/
+AppDir/
 
 # GitHub Actions artifacts
 build-reports/
@@ -178,7 +181,3 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
-
-# Git actions
-.platform
-.actrc

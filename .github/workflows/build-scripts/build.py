@@ -24,18 +24,13 @@ if platform.system() == "Windows":
         pass  # Fall back to default encoding
 
 # Get the root directory of the project (parent of .github)
-script_dir = Path(__file__).parent.absolute()
-root_dir = script_dir.parent.parent.parent.absolute()  # Go up from build-scripts -> workflows -> .github -> root
+script_dir = Path(__file__).parent
+root_dir = script_dir.parent.parent.parent  # Go up from build-scripts -> workflows -> .github -> root
+os.chdir(root_dir)  # Change to root directory for the build process
 
-# Add src to path to import version - use absolute path
-sys.path.insert(0, str(root_dir / 'src'))
+# Add src to path to import version
+sys.path.insert(0, os.path.join(root_dir, 'src'))
 from version import __version__, VERSION_DISPLAY
-
-# Store key directories as absolute paths for consistent access
-ICONS_DIR = root_dir / "icons"
-SRC_DIR = root_dir / "src"
-DIST_DIR = root_dir / "dist"
-SPEC_FILE = root_dir / ".github" / "workflows" / "build-scripts" / "mitotic-spindle-tool.spec"
 
 def run_command(cmd, check=True, capture_output=True):
     """Run a command and return the result"""
@@ -178,25 +173,26 @@ def build_with_pyinstaller(python_executable):
     """Build executable with PyInstaller"""
     print("Building executable with PyInstaller...")
     
-    # Verify paths exist using absolute paths
-    if not SPEC_FILE.exists():
-        print(f"[ERROR] Spec file not found: {SPEC_FILE}")
+    # Get the spec file path relative to root directory
+    spec_file = ".github/workflows/build-scripts/mitotic-spindle-tool.spec"
+    
+    # Verify paths exist
+    if not os.path.exists(spec_file):
+        print(f"[ERROR] Spec file not found: {spec_file}")
         return None
     
-    main_script = SRC_DIR / "spindleGUI.py"
-    if not main_script.exists():
-        print(f"[ERROR] Main script not found: {main_script}")
+    if not os.path.exists("src/spindleGUI.py"):
+        print(f"[ERROR] Main script not found: src/spindleGUI.py")
         return None
     
-    icon_file = ICONS_DIR / "EltingLabSpindle.ico"
-    if not icon_file.exists():
-        print(f"[ERROR] Icon file not found: {icon_file}")
+    if not os.path.exists("icons/EltingLabSpindle.ico"):
+        print(f"[ERROR] Icon file not found: icons/EltingLabSpindle.ico")
         return None
         
-    print(f"[INFO] Working directory: {root_dir}")
-    print(f"[INFO] Spec file path: {SPEC_FILE}")
-    print(f"[INFO] Main script path: {main_script}")
-    print(f"[INFO] Icon path: {icon_file}")
+    print(f"[INFO] Current working directory: {os.getcwd()}")
+    print(f"[INFO] Spec file path: {os.path.abspath(spec_file)}")
+    print(f"[INFO] Main script path: {os.path.abspath('src/spindleGUI.py')}")
+    print(f"[INFO] Icon path: {os.path.abspath('icons/EltingLabSpindle.ico')}")
     print(f"[INFO] Python path: {os.environ.get('PYTHONPATH', 'Not set')}")
     
     # Verify all required modules exist
@@ -206,21 +202,20 @@ def build_with_pyinstaller(python_executable):
                    'spindlePreviewDialog.py']
     
     for module in src_modules:
-        module_path = SRC_DIR / module
-        if module_path.exists():
+        module_path = os.path.join('src', module)
+        if os.path.exists(module_path):
             print(f"[INFO] [OK] Found module: {module}")
         else:
             print(f"[WARNING] [X] Missing module: {module}")
     
     # Set up environment for PyInstaller to find modules properly
     env = os.environ.copy()
-    env['PYTHONPATH'] = str(SRC_DIR)
-    env['PYINSTALLER_ROOT_DIR'] = str(root_dir)  # Help spec file find project root
+    env['PYTHONPATH'] = os.path.join(root_dir, 'src')
     
     # Copy runtime hook to ensure it's available for PyInstaller
     try:
-        runtime_hook_source = script_dir / "runtime_hook_src_modules.py"
-        if runtime_hook_source.exists():
+        runtime_hook_source = os.path.join(script_dir, "runtime_hook_src_modules.py")
+        if os.path.exists(runtime_hook_source):
             print(f"[INFO] [OK] Runtime hook found at {runtime_hook_source}")
         else:
             print(f"[WARNING] Runtime hook not found at {runtime_hook_source}")
@@ -229,19 +224,17 @@ def build_with_pyinstaller(python_executable):
     
     # Use system python if we couldn't set up venv properly
     if python_executable == sys.executable:
-        cmd = [sys.executable, "-m", "PyInstaller", str(SPEC_FILE)]
+        cmd = [sys.executable, "-m", "PyInstaller", spec_file]
     else:
-        cmd = [python_executable, "-m", "PyInstaller", str(SPEC_FILE)]
+        cmd = [python_executable, "-m", "PyInstaller", spec_file]
     
     try:
         # Run PyInstaller with output capture and custom environment
-        # Change to root directory for PyInstaller execution
-        print(f"[INFO] Running PyInstaller from directory: {root_dir}")
         print(f"[INFO] Running PyInstaller with PYTHONPATH: {env['PYTHONPATH']}")
         # Ensure UTF-8 encoding for subprocess on Windows
         encoding = 'utf-8' if platform.system() == "Windows" else None
         result = subprocess.run(cmd, check=False, capture_output=True, text=True, env=env,
-                              encoding=encoding, errors='replace', cwd=str(root_dir))
+                              encoding=encoding, errors='replace')
         if result.returncode != 0:
             print(f"[ERROR] PyInstaller failed with return code {result.returncode}")
             print("STDOUT:", result.stdout)
@@ -255,11 +248,11 @@ def build_with_pyinstaller(python_executable):
         print(f"[ERROR] PyInstaller failed with virtual env python: {e}")
         print("Trying with system python...")
         try:
-            cmd_fallback = [sys.executable, "-m", "PyInstaller", str(SPEC_FILE)]
+            cmd_fallback = [sys.executable, "-m", "PyInstaller", spec_file]
             # Ensure UTF-8 encoding for subprocess on Windows
             encoding = 'utf-8' if platform.system() == "Windows" else None
             result = subprocess.run(cmd_fallback, check=False, capture_output=True, text=True, env=env,
-                                  encoding=encoding, errors='replace', cwd=str(root_dir))
+                                  encoding=encoding, errors='replace')
             if result.returncode != 0:
                 print(f"[ERROR] PyInstaller failed with system python too, return code {result.returncode}")
                 print("STDOUT:", result.stdout)
@@ -280,11 +273,11 @@ def build_with_pyinstaller(python_executable):
     else:
         executable_name = "mitotic-spindle-tool"
     
-    executable_path = DIST_DIR / executable_name
+    executable_path = Path("dist") / executable_name
     
     # Rename executable with platform suffix for final distribution
     final_executable_name = get_platform_executable_name()
-    final_executable_path = DIST_DIR / final_executable_name
+    final_executable_path = Path("dist") / final_executable_name
     
     if executable_path.exists() and final_executable_name != executable_name:
         shutil.copy2(executable_path, final_executable_path)
@@ -304,6 +297,7 @@ def create_launcher_scripts(executable_path):
     """Create launcher scripts for the executable"""
     print("Creating launcher scripts...")
     
+    dist_path = Path("dist")
     system = platform.system().lower()
     
     if system == "windows":
@@ -312,7 +306,7 @@ def create_launcher_scripts(executable_path):
 cd /d "%~dp0"
 {executable_path.name} %*
 """
-        launcher_path = DIST_DIR / "run-mitotic-spindle-tool.bat"
+        launcher_path = dist_path / "run-mitotic-spindle-tool.bat"
         
     else:
         # Create shell launcher
@@ -328,7 +322,7 @@ cd "$SCRIPT_DIR"
 # Run the application
 ./{executable_path.name} "$@"
 """
-        launcher_path = DIST_DIR / "run-mitotic-spindle-tool.sh"
+        launcher_path = dist_path / "run-mitotic-spindle-tool.sh"
     
     with open(launcher_path, 'w') as f:
         f.write(launcher_content)
@@ -346,6 +340,7 @@ def create_distribution_package(executable_path, launcher_path):
     print("Creating distribution package...")
     
     system = platform.system().lower()
+    dist_path = Path("dist")
     
     if system == "windows":
         # Windows - no packaging needed, just provide the .exe
@@ -355,15 +350,15 @@ def create_distribution_package(executable_path, launcher_path):
     elif system == "darwin":
         # macOS - create proper app bundle and DMG
         package_name = get_platform_package_name()
-        package_path = DIST_DIR / package_name
+        package_path = dist_path / package_name
         
         try:
             # Create proper macOS .app bundle
-            app_bundle_path = create_macos_app_bundle(executable_path, DIST_DIR)
+            app_bundle_path = create_macos_app_bundle(executable_path, dist_path)
             
             if app_bundle_path:
                 # Create DMG with the app bundle
-                dmg_temp_dir = DIST_DIR / "dmg_temp"
+                dmg_temp_dir = dist_path / "dmg_temp"
                 dmg_temp_dir.mkdir(exist_ok=True)
                 
                 # Copy app bundle to temp directory
@@ -381,7 +376,7 @@ def create_distribution_package(executable_path, launcher_path):
                 dmg_bg_dir.mkdir(exist_ok=True)
                 
                 # Copy icon for volume
-                icon_source = ICONS_DIR / "EltingLabSpindle_512x512.png"
+                icon_source = Path("icons/EltingLabSpindle_512x512.png")
                 if icon_source.exists():
                     shutil.copy2(icon_source, dmg_temp_dir / ".VolumeIcon.icns")
                 
@@ -407,8 +402,9 @@ def create_distribution_package(executable_path, launcher_path):
             print(f"[WARNING] DMG creation failed: {e}, falling back to tar.gz")
             # Fallback to tar.gz on macOS if DMG creation fails
             package_name = get_platform_package_name().replace('.dmg', '.tar.gz')
-            package_path = DIST_DIR / package_name
+            package_path = dist_path / package_name
             
+            import tarfile
             with tarfile.open(package_path, 'w:gz') as tarf:
                 tarf.add(executable_path, executable_path.name)
                 tarf.add(launcher_path, launcher_path.name)
@@ -419,8 +415,9 @@ def create_distribution_package(executable_path, launcher_path):
     else:
         # Linux - create tar.gz with executable and launcher
         package_name = get_platform_package_name()
-        package_path = DIST_DIR / package_name
+        package_path = dist_path / package_name
         
+        import tarfile
         with tarfile.open(package_path, 'w:gz') as tarf:
             tarf.add(executable_path, executable_path.name)
             tarf.add(launcher_path, launcher_path.name)
@@ -523,7 +520,7 @@ def create_macos_app_bundle(executable_path, dist_path):
             
             iconset_files_created = 0
             for size, iconset_names in icon_mappings.items():
-                png_source = ICONS_DIR / f"EltingLabSpindle_{size}.png"
+                png_source = Path(f"icons/EltingLabSpindle_{size}.png")
                 if png_source.exists():
                     for iconset_name in iconset_names:
                         iconset_dest = iconset_dir / iconset_name
@@ -550,7 +547,7 @@ def create_macos_app_bundle(executable_path, dist_path):
         if not icns_created and (shutil.which("magick") or shutil.which("convert")):
             png_files = []
             for size in [16, 32, 64, 128, 256, 512]:
-                png_file = ICONS_DIR / f"EltingLabSpindle_{size}x{size}.png"
+                png_file = Path(f"icons/EltingLabSpindle_{size}x{size}.png")
                 if png_file.exists():
                     png_files.append(str(png_file))
             
@@ -567,7 +564,7 @@ def create_macos_app_bundle(executable_path, dist_path):
         # Final fallback: copy the largest PNG as icns (not ideal but works)
         if not icns_created:
             for size in [512, 256, 128, 64, 32, 16]:
-                png_icon = ICONS_DIR / f"EltingLabSpindle_{size}x{size}.png"
+                png_icon = Path(f"icons/EltingLabSpindle_{size}x{size}.png")
                 if png_icon.exists():
                     shutil.copy2(png_icon, icon_dest)
                     print(f"[WARNING] Copied PNG as ICNS (fallback): {png_icon.name}")
@@ -600,8 +597,8 @@ def create_appimage():
         # Disable FUSE in CI environments where it might not be available
         env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
     
-    # Create AppDir structure using absolute paths
-    appdir = DIST_DIR / "AppDir"
+    # Create AppDir structure
+    appdir = Path("dist/AppDir")
     appdir.mkdir(exist_ok=True)
     
     (appdir / "usr/bin").mkdir(parents=True, exist_ok=True)
@@ -614,21 +611,13 @@ def create_appimage():
     (appdir / "usr/share/icons/hicolor/32x32/apps").mkdir(parents=True, exist_ok=True)
     (appdir / "usr/share/icons/hicolor/16x16/apps").mkdir(parents=True, exist_ok=True)
     
-    # Copy executable using absolute paths
-    source_executable = DIST_DIR / "mitotic-spindle-tool"
-    target_executable = appdir / "usr/bin/mitotic-spindle-tool"
-    shutil.copy(source_executable, target_executable)
+    # Copy executable
+    shutil.copy("dist/mitotic-spindle-tool", appdir / "usr/bin/")
     # Ensure executable has proper permissions
-    os.chmod(target_executable, 0o755)
+    os.chmod(appdir / "usr/bin/mitotic-spindle-tool", 0o755)
     
     # Copy icons at various sizes for proper desktop integration
-    # Use absolute path to ensure icon directory is found regardless of working directory
-    print(f"[INFO] Looking for icons in: {ICONS_DIR}")
-    print(f"[INFO] Icons directory exists: {ICONS_DIR.exists()}")
-    
-    if ICONS_DIR.exists():
-        print(f"[INFO] Contents of icons directory: {list(ICONS_DIR.iterdir())}")
-    
+    icons_dir = Path("icons")
     icon_sizes = {
         "512x512": "EltingLabSpindle_512x512.png",
         "256x256": "EltingLabSpindle_256x256.png", 
@@ -641,42 +630,28 @@ def create_appimage():
     
     icons_copied = False
     for size, filename in icon_sizes.items():
-        icon_path = ICONS_DIR / filename
-        print(f"[INFO] Checking icon: {icon_path} (exists: {icon_path.exists()})")
+        icon_path = icons_dir / filename
         if icon_path.exists():
-            try:
-                dest_path = appdir / f"usr/share/icons/hicolor/{size}/apps/mitotic-spindle-tool.png"
-                shutil.copy(icon_path, dest_path)
-                print(f"[SUCCESS] Copied icon {filename} to AppImage at {dest_path}")
-                icons_copied = True
-            except Exception as e:
-                print(f"[ERROR] Failed to copy icon {filename}: {e}")
+            dest_path = appdir / f"usr/share/icons/hicolor/{size}/apps/mitotic-spindle-tool.png"
+            shutil.copy(icon_path, dest_path)
+            print(f"[SUCCESS] Copied icon {filename} to AppImage")
+            icons_copied = True
     
     # Copy main icon to AppDir root for AppImage integration
     main_icon_candidates = [
-        ICONS_DIR / "EltingLabSpindle_256x256.png",
-        ICONS_DIR / "EltingLabSpindle_128x128.png", 
-        ICONS_DIR / "EltingLabSpindle_512x512.png"
+        icons_dir / "EltingLabSpindle_256x256.png",
+        icons_dir / "EltingLabSpindle_128x128.png", 
+        icons_dir / "EltingLabSpindle_512x512.png"
     ]
     
-    main_icon_copied = False
     for icon_path in main_icon_candidates:
-        print(f"[INFO] Checking main icon candidate: {icon_path} (exists: {icon_path.exists()})")
         if icon_path.exists():
-            try:
-                dest_path = appdir / "mitotic-spindle-tool.png"
-                shutil.copy(icon_path, dest_path)
-                print(f"[SUCCESS] Copied main icon {icon_path.name} to AppImage root at {dest_path}")
-                main_icon_copied = True
-                break
-            except Exception as e:
-                print(f"[ERROR] Failed to copy main icon {icon_path.name}: {e}")
+            shutil.copy(icon_path, appdir / "mitotic-spindle-tool.png")
+            print(f"[SUCCESS] Copied main icon {icon_path.name} to AppImage root")
+            break
     
     if not icons_copied:
-        print("[WARNING] No icons were copied to AppImage icon directories - application may not show proper icon in desktop environments")
-    
-    if not main_icon_copied:
-        print("[WARNING] No main icon was copied to AppImage root - AppImage may not show proper icon")
+        print("[WARNING] No icons were copied to AppImage - application may not show proper icon in desktop environments")
     
     # Create desktop file
     desktop_content = """[Desktop Entry]
@@ -690,36 +665,12 @@ Terminal=false
 """
     
     # Write desktop file to the standard location
-    desktop_file_path = appdir / "usr/share/applications/mitotic-spindle-tool.desktop"
-    with open(desktop_file_path, 'w') as f:
+    with open(appdir / "usr/share/applications/mitotic-spindle-tool.desktop", 'w') as f:
         f.write(desktop_content)
-    print(f"[SUCCESS] Created desktop file at {desktop_file_path}")
     
     # Also write desktop file to AppDir root (required by AppImage)
-    root_desktop_file_path = appdir / "mitotic-spindle-tool.desktop"
-    with open(root_desktop_file_path, 'w') as f:
+    with open(appdir / "mitotic-spindle-tool.desktop", 'w') as f:
         f.write(desktop_content)
-    print(f"[SUCCESS] Created root desktop file at {root_desktop_file_path}")
-    
-    # Create a DirIcon symlink pointing to the main icon (AppImage convention)
-    diricon_path = appdir / ".DirIcon"
-    main_icon_path = appdir / "mitotic-spindle-tool.png"
-    if main_icon_path.exists() and not diricon_path.exists():
-        try:
-            os.symlink("mitotic-spindle-tool.png", diricon_path)
-            print(f"[SUCCESS] Created .DirIcon symlink at {diricon_path}")
-        except Exception as e:
-            print(f"[WARNING] Failed to create .DirIcon symlink: {e}")
-    
-    # Also copy the icon with a more standard name for better compatibility
-    if main_icon_path.exists():
-        try:
-            # Copy icon with application name for better recognition
-            alt_icon_path = appdir / "mitotic_spindle_tool.png"
-            shutil.copy(main_icon_path, alt_icon_path)
-            print(f"[SUCCESS] Created alternative icon name at {alt_icon_path}")
-        except Exception as e:
-            print(f"[WARNING] Failed to create alternative icon: {e}")
     
     # Create AppRun
     apprun_content = """#!/bin/bash
@@ -732,72 +683,48 @@ exec "${HERE}/usr/bin/mitotic-spindle-tool" "$@"
         f.write(apprun_content)
     os.chmod(apprun_path, 0o755)
     
-    # Create AppImage using absolute paths (no directory changes needed)
+    # Create AppImage
+    current_dir = os.getcwd()
     try:
+        os.chdir("dist")
+        
         # Make sure executable is executable
-        target_executable_path = appdir / "usr/bin/mitotic-spindle-tool"
-        if target_executable_path.exists():
-            os.chmod(target_executable_path, 0o755)
+        executable_path = "AppDir/usr/bin/mitotic-spindle-tool"
+        if os.path.exists(executable_path):
+            os.chmod(executable_path, 0o755)
         
-        # Debug: List AppDir contents before creating AppImage
-        print("[DEBUG] AppDir structure before creating AppImage:")
-        if appdir.exists():
-            for root, dirs, files in os.walk(appdir):
-                level = root.replace(str(appdir), '').count(os.sep)
-                indent = ' ' * 2 * level
-                print(f"{indent}{os.path.basename(root)}/")
-                subindent = ' ' * 2 * (level + 1)
-                for file in files:
-                    file_path = Path(root) / file
-                    print(f"{subindent}{file} ({file_path.stat().st_size} bytes)")
-        
-        # Run appimagetool with absolute paths (no need to change directories)
+        # Run appimagetool with more verbose output and error handling
         print("Running appimagetool...")
         appimage_name = get_platform_appimage_name()
-        appimage_path = DIST_DIR / appimage_name
-        
         result = subprocess.run(
-            ["appimagetool", "--verbose", str(appdir), str(appimage_path)], 
+            ["appimagetool", "--verbose", "AppDir", appimage_name], 
             env=env, 
             check=False, 
             capture_output=True, 
-            text=True,
-            cwd=str(root_dir)  # Run from root directory for consistency
+            text=True
         )
+        
         # Print output for debugging
         if result.stdout:
             print(f"[INFO] appimagetool stdout: {result.stdout}")
         if result.stderr:
-            print(f"[INFO] appimagetool stderr: {result.stderr}")
+            print(f"[ERROR] appimagetool stderr: {result.stderr}")
         
         print(f"[INFO] appimagetool exit code: {result.returncode}")
         
+        os.chdir(current_dir)
+        
+        appimage_path = Path("dist") / appimage_name
         if result.returncode == 0 and appimage_path.exists():
             os.chmod(appimage_path, 0o755)
             print(f"[SUCCESS] Created AppImage: {appimage_path}")
-            
-            # Test the AppImage to verify it was created correctly
-            print("[INFO] Testing AppImage...")
-            try:
-                test_result = subprocess.run([str(appimage_path), "--help"], 
-                                           capture_output=True, text=True, timeout=10)
-                if test_result.returncode == 0:
-                    print("[SUCCESS] AppImage test passed")
-                else:
-                    print(f"[WARNING] AppImage test failed with exit code {test_result.returncode}")
-                    if test_result.stderr:
-                        print(f"[WARNING] AppImage test stderr: {test_result.stderr}")
-            except subprocess.TimeoutExpired:
-                print("[WARNING] AppImage test timed out (this may be normal in CI environments)")
-            except Exception as e:
-                print(f"[WARNING] AppImage test failed with exception: {e}")
-            
             return appimage_path
         else:
             print(f"[WARNING] AppImage creation failed - appimagetool exit code: {result.returncode}")
             return None
             
     except Exception as e:
+        os.chdir(current_dir)
         print(f"[WARNING] AppImage creation failed with exception: {e}")
         return None
 
@@ -805,9 +732,10 @@ def prepare_icons():
     """Prepare and verify icons for the build process"""
     print("Preparing icons for build...")
     
-    if not ICONS_DIR.exists():
+    icons_dir = Path("icons")
+    if not icons_dir.exists():
         print("[WARNING] Icons directory not found, creating...")
-        ICONS_DIR.mkdir(exist_ok=True)
+        icons_dir.mkdir(exist_ok=True)
         return False
     
     # Icon files we need for different platforms
@@ -824,7 +752,7 @@ def prepare_icons():
     
     icons_available = {}
     for icon_type, filename in required_icons.items():
-        icon_path = ICONS_DIR / filename
+        icon_path = icons_dir / filename
         if icon_path.exists():
             icons_available[icon_type] = icon_path
             print(f"[SUCCESS] Found {icon_type} icon: {filename}")
