@@ -68,9 +68,8 @@ def setup_virtual_environment():
         os.environ["PYTHONPATH"] = os.path.join(root_dir, "src")
         return "pip", sys.executable
     
-    # For local builds, emulate CI environment to ensure consistent module handling
-    print("Local build detected, emulating CI environment...")
-    os.environ["CI"] = "true"
+    # For local builds, use consistent module handling without forcing CI mode
+    print("Local build detected, setting up consistent environment...")
     os.environ["PYTHONPATH"] = os.path.join(root_dir, "src")
     
     venv_path = Path("venv")
@@ -696,12 +695,11 @@ def create_appimage():
     
     print("Creating AppImage...")
     
-    # Set environment variables for CI compatibility
+    # Set environment variables for AppImage creation
     env = os.environ.copy()
     env["ARCH"] = "x86_64"
-    if os.environ.get("CI") or os.environ.get("GITHUB_ACTIONS"):
-        # Disable FUSE in CI environments where it might not be available
-        env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
+    # Note: Removed APPIMAGE_EXTRACT_AND_RUN=1 to fix hotkey issues
+    # This allows AppImages to use FUSE mounting which preserves Qt focus handling
     
     # Create AppDir structure using absolute paths
     appdir = DIST_DIR / "AppDir"

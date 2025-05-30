@@ -756,10 +756,10 @@ class MainWindow(QMainWindow):
         
     # handle key events for frame navigation and data addition
     def keyPressEvent(self, event: QKeyEvent):
-        # Debug information for AppImage troubleshooting
+        # Debug information for AppImage troubleshooting (reduced verbosity)
         is_appimage = os.environ.get('APPIMAGE') is not None
-        if is_appimage:
-            print(f"[DEBUG] Key pressed: {event.key()}, has focus: {self.hasFocus()}, active window: {QApplication.activeWindow() is self}")
+        if is_appimage and event.key() in [Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down]:
+            print(f"[DEBUG] Arrow key pressed in AppImage, focus: {self.hasFocus()}")
         
         if not self.fileName:
             super().keyPressEvent(event)
@@ -773,8 +773,6 @@ class MainWindow(QMainWindow):
         # Handle key mappings
         if event.key() == Qt.Key_Right:
             # Right arrow - Add data (same as Add button)
-            if is_appimage:
-                print("[DEBUG] Processing Right arrow key")
             self.onAddDataClicked()
         elif event.key() == Qt.Key_Left:
             # Left arrow - Toss/untoss data (same as Toss button)
