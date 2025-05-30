@@ -362,8 +362,14 @@ class MainWindow(QMainWindow):
     def setApplicationIcon(self):
         """Set the application icon for window, taskbar, and dock"""
         try:
-            # Use the primary icon path
-            icon_path = 'icons/EltingLabSpindle.ico'
+            # Determine the correct icon path based on execution environment
+            if getattr(sys, 'frozen', False):
+                # Running in a PyInstaller bundle
+                base_path = sys._MEIPASS
+                icon_path = os.path.join(base_path, 'icons', 'EltingLabSpindle.ico')
+            else:
+                # Running in normal Python environment
+                icon_path = 'icons/EltingLabSpindle.ico'
             
             if os.path.exists(icon_path):
                 icon = QIcon(icon_path)
@@ -375,7 +381,7 @@ class MainWindow(QMainWindow):
                     print(f"[SUCCESS] Application icon set successfully: {icon_path}")
                     return
             
-            print("⚠️ Warning: Could not find application icon file")
+            print(f"⚠️ Warning: Could not find application icon file at: {icon_path}")
             
         except Exception as e:
             print(f"⚠️ Warning: Failed to set application icon: {e}")
