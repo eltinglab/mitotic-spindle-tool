@@ -181,3 +181,9 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+# Testing
+.actrc
+*temp*
+*tmp*
+build*
