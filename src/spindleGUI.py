@@ -461,6 +461,9 @@ class MainWindow(QMainWindow):
                                             self.gOLFactorValue.value())
             self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
             self.threshPixLabel.setImageArr(arr)
+            
+            # Automatically update the preview when threshold changes
+            self.onPreviewClicked()
     
     # handle the preview button press
     def onPreviewClicked(self):
