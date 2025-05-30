@@ -166,6 +166,7 @@ run-mitotic-spindle-tool.*
 squashfs-root/
 temp_extract/
 AppDir/
+release
 
 # GitHub Actions artifacts
 build-reports/

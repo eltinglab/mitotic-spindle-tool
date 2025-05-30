@@ -102,8 +102,11 @@ jobs:
           #### 🍎 macOS
           1. Download and open \`mitotic-spindle-tool-macos.dmg\`
           2. Drag the app to your Applications folder
-          3. **Security Note**: You may need to right-click the app and select \"Open\" the first time due to Gatekeeper (unsigned app)
-          4. Alternatively, go to System Preferences → Security & Privacy → General and click \"Open Anyway\"
+          3. **IMPORTANT Security Steps**: Since this app is not signed, macOS will block it initially:
+             - **Method 1**: Right-click the app → \"Open\" → Click \"Open\" in the dialog
+             - **Method 2**: System Preferences → Security & Privacy → General → Click \"Open Anyway\"
+             - **Method 3**: Terminal: \`sudo xattr -rd com.apple.quarantine \"/Applications/Mitotic Spindle Tool.app\"\`
+          4. See the \"README - IMPORTANT.txt\" file in the DMG for detailed instructions
           
           ### Changes in this Release
           $COMMIT_HISTORY

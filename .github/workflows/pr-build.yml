@@ -32,15 +32,15 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             executable: mitotic-spindle-tool
-            python-version: '3.11'
+            python-version: '3.13'
           - os: windows-latest
             platform: windows
             executable: mitotic-spindle-tool.exe
-            python-version: '3.11'
+            python-version: '3.13'
           - os: macos-latest
             platform: macos
             executable: mitotic-spindle-tool
-            python-version: '3.11'
+            python-version: '3.13'
             
     runs-on: ${{ matrix.os }}
     

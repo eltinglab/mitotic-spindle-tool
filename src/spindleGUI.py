@@ -65,6 +65,7 @@ except ImportError as e:
 
 import os
 from numpy import zeros, arange
+import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -111,6 +112,10 @@ class MainWindow(QMainWindow):
         
         # Enable keyboard focus for key events
         self.setFocusPolicy(Qt.StrongFocus)
+        
+        # Enhanced focus management for AppImage compatibility
+        self.activateWindow()
+        self.raise_()
         
         # Add a status bar to show keyboard shortcuts
         self.statusBar().showMessage("Keyboard Controls: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iterations ±1 | A/D GOL Factor ±1 | Space Preview | M Manual | E Export")
@@ -169,7 +174,7 @@ class MainWindow(QMainWindow):
         self.dataTableArray = None
         
         # Hotkeys information
-        self.hotkeysLabel = QLabel("Hotkeys: ← Toss | → Add | ↑/↓ Threshold ±10 | W/S GOL Iter ±1 | A/D GOL Factor ±1 | Space Preview | M Manual | E Export")
+        self.hotkeysLabel = QLabel("Created by the Elting Lab\n github.com/EltingLab")
         self.hotkeysLabel.setWordWrap(True)
         self.hotkeysLabel.setStyleSheet("color: #777777; font-size: 9pt;")
 
@@ -461,6 +466,9 @@ class MainWindow(QMainWindow):
                                             self.gOLFactorValue.value())
             self.threshPixLabel.setPixmap(tiffF.threshPixFromArr(arr))
             self.threshPixLabel.setImageArr(arr)
+            
+            # Automatically update the preview when threshold changes
+            self.onPreviewClicked()
     
     # handle the preview button press
     def onPreviewClicked(self):
@@ -581,28 +589,125 @@ class MainWindow(QMainWindow):
             # Automatically generate preview for the next image
             self.onPreviewClicked()
     
-    # write the data to a textfile
+    # write the data to a textfile, CSV, or Excel file
     def onExportDataClicked(self):
         if self.fileName:
+            # Generate default filename based on the imported TIFF file
+            import os
+            base_name = os.path.splitext(os.path.basename(self.fileName))[0]
+            default_name = f"{base_name}_data.txt"
+            
+            # Use the directory of the TIFF file as the default directory
+            default_dir = os.path.dirname(self.fileName)
+            default_path = os.path.join(default_dir, default_name)
 
-            # prompt the user for the save location and file name
+            # prompt the user for the save location and file name with multiple format options
             fileName, filter = QFileDialog.getSaveFileName(
                     parent=self, caption='Export Image Data',
-                    dir=QDir.homePath(), filter="*.txt")
+                    dir=default_path, 
+                    filter="Text files (*.txt);;CSV files (*.csv);;Excel files (*.xlsx)")
             if not fileName:
                 return None # cancel the export
             
-            with open(fileName, "w", encoding="utf-8") as f:
-
-                for column in range(self.dataTableArray.shape[1]):
-                    f.write(F"{cFD.DATA_NAMES[column]}\n")
-
-                    for row in range(self.dataTableArray.shape[0]):
-                        f.write(F"{self.dataTableArray[row, column]:.4f}\n")
+            # Auto-append file extension if not present and update filename for format
+            if filter == "CSV files (*.csv)":
+                if not fileName.lower().endswith('.csv'):
+                    # Replace .txt extension with .csv if present, otherwise just add .csv
+                    if fileName.lower().endswith('.txt'):
+                        fileName = fileName[:-4] + '.csv'
+                    else:
+                        fileName += '.csv'
+            elif filter == "Excel files (*.xlsx)":
+                if not fileName.lower().endswith('.xlsx'):
+                    # Replace .txt extension with .xlsx if present, otherwise just add .xlsx
+                    if fileName.lower().endswith('.txt'):
+                        fileName = fileName[:-4] + '.xlsx'
+                    else:
+                        fileName += '.xlsx'
+            elif filter == "Text files (*.txt)":
+                if not fileName.lower().endswith('.txt'):
+                    fileName += '.txt'
+            
+            # Determine the export format based on the selected filter or file extension
+            if filter == "CSV files (*.csv)" or fileName.lower().endswith('.csv'):
+                self._export_csv(fileName)
+            elif filter == "Excel files (*.xlsx)" or fileName.lower().endswith('.xlsx'):
+                self._export_excel(fileName)
+            else:
+                # Default to original text format (unchanged from original implementation)
+                self._export_text(fileName)
+    
+    def _export_text(self, fileName):
+        """Export data in the original text format - unchanged from original implementation"""
+        with open(fileName, "w", encoding="utf-8") as f:
+            for column in range(self.dataTableArray.shape[1]):
+                f.write(F"{cFD.DATA_NAMES[column]}\n")
+                for row in range(self.dataTableArray.shape[0]):
+                    f.write(F"{self.dataTableArray[row, column]:.4f}\n")
+            
+            f.write("Bad Frames\n")
+            for frame in self.tossedFrames:
+                f.write(F"{frame}\n")
+    
+    def _export_csv(self, fileName):
+        """Export data in CSV format"""
+        try:
+            # Create DataFrame with measurement data
+            df = pd.DataFrame(self.dataTableArray, columns=cFD.DATA_NAMES)
+            
+            # Add frame numbers as the first column
+            df.insert(0, 'Frame', range(1, len(df) + 1))
+            
+            # Mark tossed frames
+            df['Tossed'] = df['Frame'].isin(self.tossedFrames)
+            
+            # Save to CSV
+            df.to_csv(fileName, index=False, float_format='%.4f')
+            
+            self.statusBar().showMessage(f"Data exported successfully to {fileName}", 3000)
+            
+        except Exception as e:
+            self.statusBar().showMessage(f"Error exporting CSV: {str(e)}", 5000)
+    
+    def _export_excel(self, fileName):
+        """Export data in Excel format with multiple sheets"""
+        try:
+            # Create DataFrame with measurement data
+            df = pd.DataFrame(self.dataTableArray, columns=cFD.DATA_NAMES)
+            
+            # Add frame numbers as the first column
+            df.insert(0, 'Frame', range(1, len(df) + 1))
+            
+            # Mark tossed frames
+            df['Tossed'] = df['Frame'].isin(self.tossedFrames)
+            
+            # Create Excel writer object
+            with pd.ExcelWriter(fileName, engine='openpyxl') as writer:
+                # Write main data to first sheet
+                df.to_excel(writer, sheet_name='Measurements', index=False, float_format='%.4f')
                 
-                f.write("Bad Frames\n")
-                for frame in self.tossedFrames:
-                    f.write(F"{frame}\n")
+                # Create a summary sheet with tossed frames
+                if self.tossedFrames:
+                    tossed_df = pd.DataFrame({'Tossed Frames': self.tossedFrames})
+                    tossed_df.to_excel(writer, sheet_name='Tossed Frames', index=False)
+                
+                # Add metadata sheet if TIFF file info is available
+                if hasattr(self, 'fileName') and self.fileName:
+                    import os
+                    metadata_df = pd.DataFrame({
+                        'Property': ['Source File', 'Total Frames', 'File Size (MB)'],
+                        'Value': [
+                            os.path.basename(self.fileName),
+                            self.totalFrameValue.text(),
+                            f"{os.path.getsize(self.fileName) / (1024*1024):.2f}" if os.path.exists(self.fileName) else "N/A"
+                        ]
+                    })
+                    metadata_df.to_excel(writer, sheet_name='File Info', index=False)
+            
+            self.statusBar().showMessage(f"Data exported successfully to {fileName}", 3000)
+            
+        except Exception as e:
+            self.statusBar().showMessage(f"Error exporting Excel: {str(e)}", 5000)
     
     # slot called anytime the inputs are modified
     def clearThreshAndPreview(self):
@@ -651,9 +756,19 @@ class MainWindow(QMainWindow):
         
     # handle key events for frame navigation and data addition
     def keyPressEvent(self, event: QKeyEvent):
+        # Debug information for AppImage troubleshooting (reduced verbosity)
+        is_appimage = os.environ.get('APPIMAGE') is not None
+        if is_appimage and event.key() in [Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down]:
+            print(f"[DEBUG] Arrow key pressed in AppImage, focus: {self.hasFocus()}")
+        
         if not self.fileName:
             super().keyPressEvent(event)
             return
+
+        # Ensure we have focus for keyboard events
+        if not self.hasFocus():
+            self.setFocus()
+            self.activateWindow()
 
         # Handle key mappings
         if event.key() == Qt.Key_Right:
@@ -911,6 +1026,17 @@ class ImageTableModel(QAbstractTableModel):
             if orientation == Qt.Vertical:
                 return str(section + 1)
 
+    # Override showEvent to ensure proper focus when window is shown
+    def showEvent(self, event):
+        """Override showEvent to ensure proper focus when window is shown"""
+        super().showEvent(event)
+        # Enhanced focus management for AppImage compatibility
+        self.activateWindow()
+        self.raise_()
+        self.setFocus()
+        # Force focus to main window for keyboard events
+        QApplication.instance().setActiveWindow(self)
+
 # main function for entry point
 def main():
     """Main entry point for the application"""
@@ -919,8 +1045,34 @@ def main():
     multiprocessing.freeze_support()
     
     app = QApplication(sys.argv)
+    
+    # Enhanced AppImage compatibility settings
+    # Set application attributes for better focus handling
+    app.setAttribute(Qt.AA_DontUseNativeMenuBar, False)
+    app.setAttribute(Qt.AA_DontUseNativeDialogs, False)
+    
+    # Set application class name for better window manager integration
+    app.setApplicationName("Mitotic Spindle Tool")
+    app.setApplicationDisplayName("Mitotic Spindle Tool")
+    app.setApplicationVersion(VERSION_DISPLAY)
+    
+    # Detect if running in AppImage environment
+    is_appimage = os.environ.get('APPIMAGE') is not None
+    if is_appimage:
+        print("[INFO] Running in AppImage environment - enabling enhanced focus handling")
+        # Set application properties for better desktop integration
+        app.setDesktopFileName("mitotic-spindle-tool")
+    
     window = MainWindow()
     window.show()
+    
+    # Enhanced focus management for AppImage
+    if is_appimage:
+        # Ensure window gets focus in AppImage environment
+        window.activateWindow()
+        window.raise_()
+        app.processEvents()  # Process pending events
+    
     sys.exit(app.exec())
 
 # create and display the application if this file is being run
