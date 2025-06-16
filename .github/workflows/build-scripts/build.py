@@ -357,42 +357,39 @@ def create_distribution_package(executable_path, launcher_path):
         package_path = DIST_DIR / package_name
         
         try:
-            # Create proper macOS .app bundle (works on any platform)
+            # Create proper macOS .app bundle
             app_bundle_path = create_macos_app_bundle(executable_path, DIST_DIR)
             
             if app_bundle_path:
-                # Check if we can create a DMG (requires hdiutil)
-                can_create_dmg = shutil.which("hdiutil") is not None
+                # Create DMG on macOS (this should only run on macOS in CI)
                 current_platform = platform.system().lower()
+                if current_platform != "darwin":
+                    print("[ERROR] DMG creation should only run on macOS in CI")
+                    raise subprocess.CalledProcessError(1, "DMG creation on wrong platform")
                 
-                if can_create_dmg:
-                    print(f"[INFO] Creating DMG on {current_platform} using hdiutil...")
-                    
-                    # Create DMG with the app bundle
-                    dmg_temp_dir = DIST_DIR / "dmg_temp"
-                    dmg_temp_dir.mkdir(exist_ok=True)
-                    
-                    # Copy app bundle to temp directory
-                    app_name = app_bundle_path.name
-                    dmg_app_path = dmg_temp_dir / app_name
-                    shutil.copytree(app_bundle_path, dmg_app_path)
-                    
-                    # Create Applications symlink for easy installation
-                    applications_link = dmg_temp_dir / "Applications"
-                    if not applications_link.exists():
-                        os.symlink("/Applications", applications_link)
-                    
-                    # Create background image folder (optional)
-                    dmg_bg_dir = dmg_temp_dir / ".background"
-                    dmg_bg_dir.mkdir(exist_ok=True)
-                    
-                    # Copy icon for volume
-                    icon_source = ICONS_DIR / "EltingLabSpindle_512x512.png"
-                    if icon_source.exists():
-                        shutil.copy2(icon_source, dmg_temp_dir / ".VolumeIcon.icns")
-                    
-                    # Create a README for macOS users about security warnings
-                    readme_content = """# Mitotic Spindle Tool - macOS Installation
+                print("[INFO] Creating DMG on macOS using hdiutil...")
+                
+                # Create DMG with the app bundle
+                dmg_temp_dir = DIST_DIR / "dmg_temp"
+                dmg_temp_dir.mkdir(exist_ok=True)
+                
+                # Copy app bundle to temp directory
+                app_name = app_bundle_path.name
+                dmg_app_path = dmg_temp_dir / app_name
+                shutil.copytree(app_bundle_path, dmg_app_path)
+                
+                # Create Applications symlink for easy installation
+                applications_link = dmg_temp_dir / "Applications"
+                if not applications_link.exists():
+                    os.symlink("/Applications", applications_link)
+                
+                # Copy icon for volume
+                icon_source = ICONS_DIR / "EltingLabSpindle_512x512.png"
+                if icon_source.exists():
+                    shutil.copy2(icon_source, dmg_temp_dir / ".VolumeIcon.icns")
+                
+                # Create a README for macOS users about security warnings
+                readme_content = """# Mitotic Spindle Tool - macOS Installation
 
 ## Security Notice
 This application is not signed with an Apple Developer certificate, so macOS may show security warnings.
@@ -427,81 +424,142 @@ https://github.com/eltinglab/mitotic-spindle-tool
 If you encounter issues, please report them at:
 https://github.com/eltinglab/mitotic-spindle-tool/issues
 """
+                
+                readme_file = dmg_temp_dir / "README - IMPORTANT.txt"
+                with open(readme_file, 'w') as f:
+                    f.write(readme_content)
+                
+                # Clean up any problematic files that might cause DMG corruption
+                problematic_patterns = [
+                    ".DS_Store", "._*", ".Spotlight-V100", ".Trashes", 
+                    ".fseventsd", ".TemporaryItems", ".VolumeIcon.icns"
+                ]
+                
+                for root, dirs, files in os.walk(dmg_temp_dir):
+                    for pattern in problematic_patterns:
+                        if pattern.startswith("._"):
+                            # Remove AppleDouble files
+                            for file in files:
+                                if file.startswith("._"):
+                                    problematic_file = Path(root) / file
+                                    try:
+                                        problematic_file.unlink()
+                                        print(f"[INFO] Removed AppleDouble file: {file}")
+                                    except Exception as e:
+                                        print(f"[WARNING] Could not remove {file}: {e}")
+                        else:
+                            # Remove exact matches
+                            problematic_file = Path(root) / pattern
+                            if problematic_file.exists():
+                                try:
+                                    if problematic_file.is_dir():
+                                        shutil.rmtree(problematic_file)
+                                    else:
+                                        problematic_file.unlink()
+                                    print(f"[INFO] Removed problematic file/dir: {pattern}")
+                                except Exception as e:
+                                    print(f"[WARNING] Could not remove {pattern}: {e}")
+                
+                # Ensure all files in the DMG temp directory have proper permissions
+                for root, dirs, files in os.walk(dmg_temp_dir):
+                    for file in files:
+                        file_path = Path(root) / file
+                        try:
+                            # Set readable permissions for all files
+                            file_path.chmod(0o644)
+                        except Exception as e:
+                            print(f"[WARNING] Could not set permissions for {file}: {e}")
+                    for dir_name in dirs:
+                        dir_path = Path(root) / dir_name
+                        try:
+                            # Set directory permissions
+                            dir_path.chmod(0o755)
+                        except Exception as e:
+                            print(f"[WARNING] Could not set permissions for {dir_name}: {e}")
+                
+                # Ensure the app bundle has executable permissions
+                app_executable_in_dmg = dmg_temp_dir / app_name / "Contents" / "MacOS" / "mitotic-spindle-tool"
+                if app_executable_in_dmg.exists():
+                    try:
+                        app_executable_in_dmg.chmod(0o755)
+                        print("[INFO] Set executable permissions for app bundle executable")
+                    except Exception as e:
+                        print(f"[WARNING] Could not set executable permissions: {e}")
+                
+                print(f"[INFO] DMG temp directory prepared: {dmg_temp_dir}")
+                
+                # Create DMG using native macOS hdiutil with simple, reliable settings
+                dmg_create_cmd = [
+                    "hdiutil", "create", 
+                    "-volname", "Mitotic Spindle Tool",
+                    "-srcfolder", str(dmg_temp_dir),
+                    "-ov",  # Overwrite if exists
+                    "-format", "UDZO",  # Zlib compressed format
+                    "-imagekey", "zlib-level=6",  # Moderate compression for reliability
+                    str(package_path)
+                ]
+                
+                result = run_command(dmg_create_cmd, check=False)
+                
+                if result.returncode == 0 and package_path.exists():
+                    print(f"[SUCCESS] DMG created successfully: {package_path}")
                     
-                    readme_file = dmg_temp_dir / "README - IMPORTANT.txt"
-                    with open(readme_file, 'w') as f:
-                        f.write(readme_content)
+                    # Verify DMG was created successfully
+                    verify_result = run_command([
+                        "hdiutil", "verify", str(package_path)
+                    ], check=False)
                     
-                    # Create DMG with better compression and verification
-                    dmg_create_cmd = [
-                        "hdiutil", "create", 
-                        "-volname", "Mitotic Spindle Tool",
-                        "-srcfolder", str(dmg_temp_dir),
-                        "-ov", "-format", "UDZO",
-                        "-imagekey", "zlib-level=9",  # Maximum compression
-                        str(package_path)
-                    ]
-                    
-                    # Add filesystem type for better compatibility
-                    if current_platform == "darwin":
-                        dmg_create_cmd.extend(["-fs", "HFS+"])
-                    
-                    result = run_command(dmg_create_cmd, check=False)
-                    
-                    if result.returncode == 0 and package_path.exists():
-                        # Verify DMG was created successfully
-                        verify_result = run_command([
-                            "hdiutil", "verify", str(package_path)
+                    if verify_result.returncode == 0:
+                        print(f"[SUCCESS] DMG verification passed: {package_path}")
+                        
+                        # Additional integrity check - try to mount and unmount
+                        mount_result = run_command([
+                            "hdiutil", "attach", "-readonly", "-nobrowse", str(package_path)
                         ], check=False)
                         
-                        if verify_result.returncode == 0:
-                            print(f"[SUCCESS] Created and verified DMG: {package_path}")
-                            
-                            # Add platform-specific warnings
-                            if current_platform != "darwin":
-                                print("[WARNING] DMG created on non-macOS system:")
-                                print("  - App bundle may need code signing on macOS")
-                                print("  - Users may need to allow the app in System Preferences > Security & Privacy")
-                                print("  - Consider notarizing the app for better user experience")
+                        if mount_result.returncode == 0:
+                            print("[SUCCESS] DMG mount test passed")
+                            # Extract mount point from output and unmount
+                            try:
+                                # Parse mount output to find mount point
+                                mount_lines = mount_result.stdout.split('\n')
+                                mount_point = None
+                                for line in mount_lines:
+                                    if '/Volumes/' in line:
+                                        mount_point = line.split()[-1]
+                                        break
+                                
+                                if mount_point:
+                                    unmount_result = run_command([
+                                        "hdiutil", "detach", mount_point
+                                    ], check=False)
+                                    if unmount_result.returncode == 0:
+                                        print("[SUCCESS] DMG unmount test passed")
+                                    else:
+                                        print(f"[WARNING] DMG unmount failed: {unmount_result.stderr}")
+                            except Exception as e:
+                                print(f"[WARNING] DMG mount/unmount test incomplete: {e}")
                         else:
-                            print(f"[WARNING] DMG verification failed: {verify_result.stderr}")
-                            print("DMG was created but may have issues")
+                            print(f"[WARNING] DMG mount test failed: {mount_result.stderr}")
                     else:
-                        print(f"[ERROR] DMG creation failed: {result.stderr}")
-                        raise subprocess.CalledProcessError(result.returncode, dmg_create_cmd)
-                    
-                    # Clean up temp directory
-                    shutil.rmtree(dmg_temp_dir)
-                    
-                    return package_path
+                        print(f"[WARNING] DMG verification failed: {verify_result.stderr}")
+                        print("DMG was created but may have structural issues")
+                        # Don't fail the build, but warn about potential issues
                 else:
-                    print(f"[WARNING] hdiutil not available on {current_platform}, falling back to tar.gz")
-                    raise subprocess.CalledProcessError(1, "hdiutil not available")
+                    print(f"[ERROR] DMG creation failed: {result.stderr}")
+                    raise subprocess.CalledProcessError(result.returncode, dmg_create_cmd)
+                
+                # Clean up temp directory
+                shutil.rmtree(dmg_temp_dir)
+                
+                return package_path
             else:
-                print("[WARNING] App bundle creation failed, falling back to tar.gz")
-                raise subprocess.CalledProcessError(1, "app bundle creation")
-            
+                print("[ERROR] App bundle creation failed")
+                raise subprocess.CalledProcessError(1, "app bundle creation failed")
+                
         except subprocess.CalledProcessError as e:
-            print(f"[WARNING] DMG creation failed: {e}, falling back to tar.gz")
-            # Fallback to tar.gz on macOS if DMG creation fails
-            package_name = get_platform_package_name().replace('.dmg', '.tar.gz')
-            package_path = DIST_DIR / package_name
-            
-            # If we have an app bundle, include it in the tar.gz
-            if 'app_bundle_path' in locals() and app_bundle_path and app_bundle_path.exists():
-                with tarfile.open(package_path, 'w:gz') as tarf:
-                    tarf.add(app_bundle_path, app_bundle_path.name)
-                    if launcher_path.exists():
-                        tarf.add(launcher_path, launcher_path.name)
-                print(f"[SUCCESS] Created macOS package with app bundle: {package_path}")
-            else:
-                # Fall back to just the executable
-                with tarfile.open(package_path, 'w:gz') as tarf:
-                    tarf.add(executable_path, executable_path.name)
-                    tarf.add(launcher_path, launcher_path.name)
-                print(f"[SUCCESS] Created fallback package: {package_path}")
-            
-            return package_path
+            print(f"[ERROR] DMG creation failed: {e}")
+            sys.exit(1)
         
     else:
         # Linux - create tar.gz with executable and launcher
@@ -516,16 +574,16 @@ https://github.com/eltinglab/mitotic-spindle-tool/issues
         return package_path
 
 def create_macos_app_bundle(executable_path, dist_path):
-    """Create a proper macOS .app bundle"""
-    # Note: We can create app bundles on any platform, but they may need signing on macOS
+    """Create a proper macOS .app bundle on macOS"""
     app_name = "Mitotic Spindle Tool.app"
     app_bundle_path = dist_path / app_name
     
     print(f"Creating macOS app bundle: {app_bundle_path}")
-    current_platform = platform.system().lower()
     
-    if current_platform != "darwin":
-        print(f"[WARNING] Creating macOS app bundle on {current_platform} - bundle may require additional steps on macOS")
+    # Verify we're on macOS for this operation
+    if platform.system().lower() != "darwin":
+        print("[ERROR] App bundle creation should only run on macOS in CI")
+        return None
     
     # Create app bundle directory structure
     contents_dir = app_bundle_path / "Contents"
